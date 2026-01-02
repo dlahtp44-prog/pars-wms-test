@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>엑셀 센터</h1>
+
+<div class="grid">
+  <div class="card">
+    <div class="card-title">업로드</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>구분</th>
+          <th>설명</th>
+          <th>이동</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>입고 업로드</td>
+          <td>엑셀(.xlsx)을 업로드하면 재고에 수량이 <b>추가</b>되고 이력에 기록됩니다.</td>
+          <td><a class="btn" href="/page/excel/inbound">열기</a></td>
+        </tr>
+        <tr>
+          <td>출고 업로드</td>
+          <td>엑셀(.xlsx)을 업로드하면 재고에서 수량이 <b>차감</b>되고 이력에 기록됩니다.</td>
+          <td><a class="btn" href="/page/excel/outbound">열기</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">다운로드</div>
+    <div class="help">
+      <p>필터를 비우면 전체 다운로드 됩니다.</p>
+    </div>
+
+    <h3 style="margin:12px 0 6px;">재고 조회 다운로드</h3>
+    <form class="row" action="/page/inventory/excel" method="get">
+      <div class="field"><label>창고</label><input name="warehouse" placeholder="" /></div>
+      <div class="field"><label>로케이션</label><input name="location" placeholder="" /></div>
+      <div class="field"><label>브랜드</label><input name="brand" placeholder="" /></div>
+      <div class="field"><label>품번</label><input name="item_code" placeholder="" /></div>
+      <div class="field"><label>LOT</label><input name="lot" placeholder="" /></div>
+      <div class="field"><label>규격</label><input name="spec" placeholder="" /></div>
+      <div class="actions"><button class="btn" type="submit">재고 엑셀 다운로드</button></div>
+    </form>
+
+    <h3 style="margin:16px 0 6px;">이력 다운로드</h3>
+    <form class="row" action="/page/history/excel" method="get">
+      <div class="field"><label>년(YYYY)</label><input name="year" inputmode="numeric" pattern="[0-9]*" /></div>
+      <div class="field"><label>월(1-12)</label><input name="month" inputmode="numeric" pattern="[0-9]*" /></div>
+      <div class="field"><label>일(1-31)</label><input name="day" inputmode="numeric" pattern="[0-9]*" /></div>
+      <div class="actions"><button class="btn" type="submit">이력 엑셀 다운로드</button></div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

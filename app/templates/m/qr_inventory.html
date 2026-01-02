@@ -1,132 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8" />
-    <title>QR 재고 조회</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            margin: 0;
-            padding: 12px;
-            background: #111;
-            color: #fff;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        #reader {
-            width: 100%;
-            max-width: 420px;
-            margin: auto;
-        }
-        .info {
-            margin-top: 10px;
-            text-align: center;
-            color: #ccc;
-            font-size: 14px;
-        }
-        .result {
-            margin-top: 16px;
-            padding: 12px;
-            background: #222;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>로케이션 재고</title>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <h2>로케이션 재고</h2>
+    <p class="small">로케이션: <b>{{location}}</b></p>
 
-<h2>QR 재고 조회</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>브랜드</th>
+          <th>품번</th>
+          <th>품명</th>
+          <th>LOT</th>
+          <th>규격</th>
+          <th>수량</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{r.brand}}</td>
+          <td><a href="/m/inventory/detail?item_code={{r.item_code}}&lot={{r.lot}}&spec={{r.spec}}&brand={{r.brand}}">{{r.item_code}}</a></td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.lot}}</td>
+          <td>{{r.spec}}</td>
+          <td>{{r.qty}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
 
-<div id="reader"></div>
-<div class="info">
-    📦 로케이션 또는 제품 QR을 스캔하세요
+    <p><a href="/m/qr">← QR</a></p>
+  </div>
 </div>
-
-<div id="result" class="result" style="display:none;"></div>
-
-<script>
-    const resultBox = document.getElementById("result");
-
-    const onScanSuccess = (decodedText) => {
-        console.log("QR 인식:", decodedText);
-
-        resultBox.style.display = "block";
-        resultBox.innerHTML = "조회 중...";
-
-        fetch(`/api/inventory/qr?code=${encodeURIComponent(decodedText)}`)
-            .then(res => {
-                if (!res.ok) throw new Error("조회 실패");
-                return res.json();
-            })
-            .then(data => {
-                if (!data || data.length === 0) {
-                    resultBox.innerHTML = "❌ 재고 없음";
-                    return;
-                }
-
-                let html = "<b>재고 정보</b><br><br>";
-                data.forEach(row => {
-                    html += `
-                        창고: ${row.warehouse}<br>
-                        로케이션: ${row.location}<br>
-                        브랜드: ${row.brand || "-"}<br>
-                        품번: ${row.item_code}<br>
-                        품명: ${row.item_name}<br>
-                        LOT: ${row.lot}<br>
-                        규격: ${row.spec}<br>
-                        수량: <b>${row.qty}</b>
-                        <hr>
-                    `;
-                });
-
-                resultBox.innerHTML = html;
-            })
-            .catch(err => {
-                console.error(err);
-                resultBox.innerHTML = "⚠ 조회 중 오류 발생";
-            });
-    };
-
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    };
-
-    const html5QrCode = new Html5Qrcode("reader");
-
-    Html5Qrcode.getCameras().then(devices => {
-        if (!devices || devices.length === 0) {
-            alert("카메라를 찾을 수 없습니다.");
-            return;
-        }
-
-        // 🔥 후면 카메라 우선
-        let backCamera = devices.find(d =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("rear")
-        );
-
-        const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-        html5QrCode.start(
-            cameraId,
-            config,
-            onScanSuccess
-        );
-    }).catch(err => {
-        console.error(err);
-        alert("카메라 접근 실패");
-    });
-</script>
-
 </body>
 </html>

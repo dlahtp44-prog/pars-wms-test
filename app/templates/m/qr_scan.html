@@ -1,90 +1,47 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8" />
-    <title>QR 스캔</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- html5-qrcode -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            margin: 0;
-            padding: 12px;
-            background: #111;
-            color: #fff;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        #reader {
-            width: 100%;
-            max-width: 420px;
-            margin: auto;
-        }
-        .info {
-            margin-top: 12px;
-            font-size: 14px;
-            text-align: center;
-            color: #ccc;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>{{title}}</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <h2>{{title}}</h2>
+    {% if desc %}<p class="small">{{desc}}</p>{% endif %}
+    <div id="reader" style="width:100%"></div>
 
-<h2>QR 스캔</h2>
+    <form id="f" method="post" action="{{action}}">
+      {% for k,v in (hidden or {}).items() %}
+        <input type="hidden" name="{{k}}" value="{{v}}">
+      {% endfor %}
 
-<div id="reader"></div>
-<div class="info">
-    📷 후면 카메라로 QR을 스캔하세요
+      <label>스캔 결과</label>
+      <textarea id="qrtext" name="qrtext" placeholder="스캔되면 자동 입력됩니다. (필요 시 수정 가능)" required></textarea>
+      <button type="submit">다음</button>
+    </form>
+
+    <p class="small"><a href="/m">← 모바일</a></p>
+  </div>
 </div>
 
 <script>
-    const qrCodeSuccessCallback = (decodedText) => {
-        console.log("QR 인식:", decodedText);
+const qrtext=document.getElementById('qrtext');
+const qr = new Html5Qrcode("reader");
 
-        // 예: 이동 시작 QR → 다음 단계로 전달
-        // 필요 시 쿼리스트링으로 넘김
-        window.location.href = `/m/move/from?code=${encodeURIComponent(decodedText)}`;
-    };
-
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    };
-
-    const html5QrCode = new Html5Qrcode("reader");
-
-    Html5Qrcode.getCameras().then(devices => {
-        if (!devices || devices.length === 0) {
-            alert("카메라를 찾을 수 없습니다.");
-            return;
-        }
-
-        // 🔥 후면 카메라 우선 선택
-        let backCamera = devices.find(d =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("rear")
-        );
-
-        const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-        html5QrCode.start(
-            cameraId,
-            config,
-            qrCodeSuccessCallback
-        );
-    }).catch(err => {
-        console.error(err);
-        alert("카메라 접근 실패");
-    });
+Html5Qrcode.getCameras().then((cameras)=>{
+  if (!cameras || cameras.length === 0) return;
+  const cameraId = cameras[0].id;
+  qr.start(
+    cameraId,
+    { fps: 10, qrbox: { width: 260, height: 260 } },
+    (decodedText) => { qrtext.value = decodedText; },
+    () => {}
+  );
+}).catch(()=>{});
 </script>
-
 </body>
 </html>
