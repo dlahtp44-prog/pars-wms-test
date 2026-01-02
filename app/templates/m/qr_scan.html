@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>QR 스캔</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>QR 스캔</h2>
+    <div id="reader" style="width:100%"></div>
+
+    <form id="f" method="post" action="/m/qr/submit">
+      <label>스캔 결과</label>
+      <textarea id="qrtext" name="qrtext" placeholder="스캔되면 자동 입력됩니다." required></textarea>
+      <button type="submit">조회</button>
+    </form>
+    <p class="small">품목 QR 표준 포맷: 품번= / 품명= / LOT= / 규격= (줄바꿈)</p>
+    <p><a href="/m">← 모바일</a></p>
+  </div>
+</div>
+<script>
+const qrRegionId = "reader";
+const qr = new Html5Qrcode(qrRegionId);
+const qrtext = document.getElementById("qrtext");
+Html5Qrcode.getCameras().then(cameras => {
+  if (!cameras || cameras.length === 0) return;
+  const cameraId = cameras[0].id;
+  qr.start(
+    cameraId,
+    { fps: 10, qrbox: { width: 260, height: 260 } },
+    (decodedText) => {
+      qrtext.value = decodedText;
+      // 자동 제출은 UX상 안함 (사용자가 확인 후 조회)
+    },
+    () => {}
+  );
+}).catch(()=>{});
+</script>
+</body></html>
