@@ -45,6 +45,7 @@ def select_submit(
     from_location: str = Form(...),
     picked: str = Form(...),
     qty: int = Form(...),
+    operator: str = Form(""),
     note: str = Form(""),
 ):
     parts = picked.split("||")
@@ -59,6 +60,7 @@ def select_submit(
             "lot": lot,
             "spec": spec,
             "qty": str(qty),
+            "operator": operator or "",
             "note": note,
         }
     )
@@ -69,6 +71,7 @@ def scan_to(
     request: Request,
     warehouse: str,
     from_location: str,
+    operator: str,
     brand: str,
     item_code: str,
     item_name: str,
@@ -86,6 +89,7 @@ def scan_to(
         "lot": lot,
         "spec": spec,
         "qty": str(qty),
+        "operator": operator or "",
         "note": note or "",
     }
     return templates.TemplateResponse(
@@ -111,6 +115,7 @@ def to_submit(
     lot: str = Form(...),
     spec: str = Form(...),
     qty: int = Form(...),
+    operator: str = Form(""),
     note: str = Form(""),
 ):
     to_location = (qrtext or "").strip()
@@ -118,7 +123,7 @@ def to_submit(
     # 이동 처리(출발 - / 도착 +)
     upsert_inventory(warehouse, from_location, brand, item_code, item_name, lot, spec, -int(qty), note)
     upsert_inventory(warehouse, to_location, brand, item_code, item_name, lot, spec, int(qty), note)
-    add_history("이동", warehouse, brand, item_code, item_name, lot, spec, from_location, to_location, int(qty), note)
+    add_history("이동", warehouse, operator, brand, item_code, item_name, lot, spec, from_location, to_location, int(qty), note)
 
     msg = (
         f"OK\n"

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 import openpyxl
 import io
 from app.db import upsert_inventory, add_history
@@ -7,7 +7,7 @@ from app.utils.excel_kor_columns import build_col_index, validate_required
 router = APIRouter(prefix="/api/excel/outbound", tags=["excel-outbound"])
 
 @router.post("")
-async def excel_outbound(file: UploadFile = File(...)):
+async def excel_outbound(operator: str = Form(""), file: UploadFile = File(...)):
     """출고 엑셀 업로드 (한글 컬럼 고정)
     필수 컬럼: 로케이션, 품번, 품명, LOT, 규격, 수량
     선택 컬럼: 비고, 창고
@@ -52,7 +52,7 @@ async def excel_outbound(file: UploadFile = File(...)):
                 raise ValueError("수량은 1 이상")
 
             upsert_inventory(warehouse, location, item_code, item_name, lot, spec, -qty, note)
-            add_history("출고", warehouse, brand, item_code, item_name, lot, spec, location, "", qty, note)
+            add_history("출고", warehouse, operator, brand, item_code, item_name, lot, spec, location, "", qty, note)
             success += 1
         except Exception as e:
             fail += 1

@@ -6,6 +6,7 @@ router = APIRouter(prefix="/api/move", tags=["api-move"])
 @router.post("")
 def move(
     warehouse: str = Form(...),
+    operator: str = Form(""),
     brand: str = Form(...),
     from_location: str = Form(...),
     to_location: str = Form(...),
@@ -21,5 +22,5 @@ def move(
     # 빼기/더하기
     upsert_inventory(warehouse, from_location, brand, item_code, item_name, lot, spec, -qty, note)
     upsert_inventory(warehouse, to_location, brand, item_code, item_name, lot, spec, qty, note)
-    add_history("이동", warehouse, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note)
+    add_history("이동", warehouse, operator, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note)
     return {"ok": True}

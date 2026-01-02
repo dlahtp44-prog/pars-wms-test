@@ -43,6 +43,7 @@ def init_db() -> None:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL, -- 입고/출고/이동
         warehouse TEXT NOT NULL,
+        operator TEXT NOT NULL DEFAULT '',
         brand TEXT NOT NULL DEFAULT '',
         item_code TEXT NOT NULL,
         item_name TEXT NOT NULL,
@@ -113,6 +114,7 @@ def upsert_inventory(
 def add_history(
     type_: str,
     warehouse: str,
+    operator: str,
     brand: str,
     item_code: str,
     item_name: str,
@@ -127,11 +129,12 @@ def add_history(
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO history
-        (type, warehouse, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (type, warehouse, operator, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             type_,
             warehouse,
+            operator or "",
             brand or "",
             item_code,
             item_name,
