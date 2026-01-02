@@ -1,55 +1,49 @@
+from fastapi import APIRouter
+from app.db import query_inventory
+from app.utils.qr_format import is_item_qr, extract_item_fields
+
+router = APIRouter(prefix="/api/inventory", tags=["api-inventory"])
+
+@router.get("")
+def inventory(
+    warehouse: str = "",
+    location: str = "",
+    brand: str = "",
+    item_code: str = "",
+    lot: str = "",
+    spec: str = "",
+):
+    return {
+        "rows": query_inventory(
+            warehouse=warehouse,
+            location=location,
+            brand=brand,
+            item_code=item_code,
+            lot=lot,
+            spec=spec,
+        )
+    }
+
+from app.utils.qr_format import is_item_qr, extract_item_fields
+
 @router.get("/qr")
-def inventory_by_qr(code: str):
-    code = code.strip()  # 🔥 줄바꿈 제거
+def inventory_by_qr(code: str = ""):
+    """QR 값으로 재고 조회 (로케이션 QR 또는 품목 QR)."""
+    code = (code or "").strip()
+    if not code:
+        return {"rows": []}
 
-    conn = get_db()
-    cur = conn.cursor()
+    # 품목 QR(브랜드/품번/LOT/규격)
+    if is_item_qr(code):
+        brand, item_code, _item_name, lot, spec = extract_item_fields(code)
+        rows = query_inventory(
+            brand=brand,
+            item_code=item_code,
+            lot=lot,
+            spec=spec,
+        )
+        return {"rows": rows}
 
-    # 1️⃣ 로케이션 QR 조회
-    cur.execute("""
-        SELECT warehouse, location, item_code, item_name, lot, size, quantity
-        FROM inventory
-        WHERE location = ?
-        ORDER BY item_code, lot, size
-    """, (code,))
-    rows = cur.fetchall()
-
-    if rows:
-        return [
-            {
-                "warehouse": r[0],
-                "location": r[1],
-                "item_code": r[2],
-                "item_name": r[3],
-                "lot": r[4],
-                "spec": r[5],
-                "qty": r[6],
-            }
-            for r in rows
-        ]
-
-    # 2️⃣ 제품 QR (item|lot|spec)
-    try:
-        item_code, lot, spec = code.split("|")
-    except:
-        return []
-
-    cur.execute("""
-        SELECT warehouse, location, item_code, item_name, lot, size, quantity
-        FROM inventory
-        WHERE item_code=? AND lot=? AND size=?
-    """, (item_code, lot, spec))
-
-    rows = cur.fetchall()
-    return [
-        {
-            "warehouse": r[0],
-            "location": r[1],
-            "item_code": r[2],
-            "item_name": r[3],
-            "lot": r[4],
-            "spec": r[5],
-            "qty": r[6],
-        }
-        for r in rows
-    ]
+    # 기본: 로케이션 코드
+    rows = query_inventory(location=code)
+    return {"rows": rows}

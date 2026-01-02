@@ -14,8 +14,9 @@ router = APIRouter(prefix="/m/move", tags=["mobile-move"])
 def start(request: Request):
     return templates.TemplateResponse("m/move_start.html", {"request": request})
 
+# 1) 출발 로케이션 스캔
 @router.get("/from", response_class=HTMLResponse)
-def scan_from(request: Request):
+def from_scan(request: Request):
     return templates.TemplateResponse(
         "m/qr_scan.html",
         {
@@ -32,9 +33,13 @@ def from_submit(qrtext: str = Form(...)):
     from_location = (qrtext or "").strip()
     return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
 
+# 2) 제품 선택 + 수량 입력
 @router.get("/select", response_class=HTMLResponse)
 def select_item(request: Request, from_location: str):
+    from_location = (from_location or "").strip()
     rows = query_inventory(location=from_location)
+    # qty>0만
+    rows = [r for r in rows if int(r.get("qty", 0) or 0) > 0]
     return templates.TemplateResponse(
         "m/move_select.html",
         {"request": request, "from_location": from_location, "rows": rows},
@@ -43,44 +48,43 @@ def select_item(request: Request, from_location: str):
 @router.post("/select/submit")
 def select_submit(
     from_location: str = Form(...),
-    picked: str = Form(...),
+    pick: str = Form(...),
     qty: int = Form(...),
     operator: str = Form(""),
     note: str = Form(""),
 ):
-    parts = picked.split("||")
-    warehouse, brand, item_code, item_name, lot, spec = (parts + [""] * 6)[:6]
-    qs = urlencode(
-        {
-            "warehouse": warehouse,
-            "from_location": from_location,
-            "brand": brand,
-            "item_code": item_code,
-            "item_name": item_name,
-            "lot": lot,
-            "spec": spec,
-            "qty": str(qty),
-            "operator": operator or "",
-            "note": note,
-        }
-    )
-    return RedirectResponse(url=f"/m/move/to?{qs}", status_code=303)
+    from_location = (from_location or "").strip()
+    operator = (operator or "").strip()
+    note = (note or "").strip()
+    try:
+        qty = int(qty)
+    except:
+        qty = 0
+    if qty <= 0:
+        return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
 
-@router.get("/to", response_class=HTMLResponse)
-def scan_to(
-    request: Request,
-    warehouse: str,
-    from_location: str,
-    operator: str,
-    brand: str,
-    item_code: str,
-    item_name: str,
-    lot: str,
-    spec: str,
-    qty: int,
-    note: str = "",
-):
-    hidden = {
+    # pick: warehouse|||brand|||item_code|||item_name|||lot|||spec
+    parts = (pick or "").split("|||")
+    if len(parts) != 6:
+        return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
+
+    warehouse, brand, item_code, item_name, lot, spec = [p.strip() for p in parts]
+
+    # 현재 재고 확인 (부족하면 차단)
+    rows = query_inventory(
+        warehouse=warehouse,
+        location=from_location,
+        brand=brand,
+        item_code=item_code,
+        lot=lot,
+        spec=spec,
+    )
+    available = int(rows[0].get("qty", 0)) if rows else 0
+    if qty > available:
+        # 부족: 다시 선택 화면으로
+        return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
+
+    params = {
         "warehouse": warehouse,
         "from_location": from_location,
         "brand": brand,
@@ -88,6 +92,35 @@ def scan_to(
         "item_name": item_name,
         "lot": lot,
         "spec": spec,
+        "qty": qty,
+        "operator": operator,
+        "note": note,
+    }
+    return RedirectResponse(url=f"/m/move/to?{urlencode(params)}", status_code=303)
+
+# 3) 도착 로케이션 스캔
+@router.get("/to", response_class=HTMLResponse)
+def to_scan(
+    request: Request,
+    warehouse: str,
+    from_location: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty: int,
+    operator: str = "",
+    note: str = "",
+):
+    hidden = {
+        "warehouse": warehouse,
+        "from_location": (from_location or "").strip(),
+        "brand": brand or "",
+        "item_code": item_code or "",
+        "item_name": item_name or "",
+        "lot": lot or "",
+        "spec": spec or "",
         "qty": str(qty),
         "operator": operator or "",
         "note": note or "",
@@ -109,7 +142,7 @@ def to_submit(
     qrtext: str = Form(...),
     warehouse: str = Form(...),
     from_location: str = Form(...),
-    brand: str = Form(...),
+    brand: str = Form(""),
     item_code: str = Form(...),
     item_name: str = Form(...),
     lot: str = Form(...),
@@ -119,11 +152,65 @@ def to_submit(
     note: str = Form(""),
 ):
     to_location = (qrtext or "").strip()
+    from_location = (from_location or "").strip()
+    operator = (operator or "").strip()
+    note = (note or "").strip()
+    try:
+        qty = int(qty)
+    except:
+        qty = 0
 
-    # 이동 처리(출발 - / 도착 +)
-    upsert_inventory(warehouse, from_location, brand, item_code, item_name, lot, spec, -int(qty), note)
-    upsert_inventory(warehouse, to_location, brand, item_code, item_name, lot, spec, int(qty), note)
-    add_history("이동", warehouse, operator, brand, item_code, item_name, lot, spec, from_location, to_location, int(qty), note)
+    # 재고 재확인 (부족하면 차단)
+    rows = query_inventory(
+        warehouse=warehouse,
+        location=from_location,
+        brand=brand,
+        item_code=item_code,
+        lot=lot,
+        spec=spec,
+    )
+    available = int(rows[0].get("qty", 0)) if rows else 0
+    if qty <= 0 or qty > available:
+        return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
+
+    # 출발 -qty, 도착 +qty
+    upsert_inventory(
+        warehouse=warehouse,
+        location=from_location,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        qty_delta=-qty,
+        note=note,
+    )
+    upsert_inventory(
+        warehouse=warehouse,
+        location=to_location,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        qty_delta=qty,
+        note=note,
+    )
+
+    add_history(
+        type_="이동",
+        warehouse=warehouse,
+        operator=operator,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        from_location=from_location,
+        to_location=to_location,
+        qty=qty,
+        note=note,
+    )
 
     msg = (
         f"OK\n"

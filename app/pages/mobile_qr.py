@@ -9,7 +9,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @router.get("", response_class=HTMLResponse)
 def qr_scan(request: Request):
-    return templates.TemplateResponse("m/qr_scan.html", {"request": request})
+    return templates.TemplateResponse("m/qr_scan.html", {"request": request, "title": "QR 스캔", "desc": "로케이션 또는 제품 QR을 스캔하세요.", "action": "/m/qr/submit", "hidden": {}})
 
 @router.post("/submit")
 def qr_submit(qrtext: str = Form(...)):

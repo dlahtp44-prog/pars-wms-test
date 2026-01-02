@@ -1,55 +1,142 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>QR 스캔</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <style>
-        body {
-            margin: 0;
-            padding: 12px;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #111;
-            color: #fff;
-        }
-        #reader {
-            width: 100%;
-        }
-        .hint {
-            text-align: center;
-            margin-top: 12px;
-            font-size: 14px;
-            color: #ccc;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>{{ title or "QR 스캔" }}</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <h2>{{ title or "QR 스캔" }}</h2>
+    {% if desc %}<p class="small">{{ desc }}</p>{% endif %}
 
-<h3>QR 스캔</h3>
+    <div id="reader" style="width:100%"></div>
 
-<div id="reader"></div>
-<div class="hint">📷 후면 카메라 사용 중</div>
+    <form id="qrForm" method="post" action="{{ action or '/m/qr/submit' }}">
+      <input id="qrtext" name="qrtext" type="hidden" value="">
+      {% if hidden %}
+        {% for k, v in hidden.items() %}
+          <input type="hidden" name="{{k}}" value="{{v}}">
+        {% endfor %}
+      {% endif %}
+    </form>
+
+    <div class="grid" style="margin-top:12px;">
+      <button type="button" id="toggleBtn">카메라 전환</button>
+      <button type="button" id="restartBtn">다시 시작</button>
+    </div>
+
+    <p class="small" style="margin-top:10px;">
+      스캔이 안되면 <b>브라우저 카메라 권한</b>을 확인하세요. (HTTPS 필요)
+    </p>
+    <p class="small"><a href="/m">← 모바일</a></p>
+  </div>
+</div>
 
 <script>
-    const html5QrCode = new Html5Qrcode("reader");
+(function(){
+  const qr = new Html5Qrcode("reader");
+  const qrtextEl = document.getElementById("qrtext");
+  const formEl = document.getElementById("qrForm");
+  const toggleBtn = document.getElementById("toggleBtn");
+  const restartBtn = document.getElementById("restartBtn");
 
-    html5QrCode.start(
-        { facingMode: { exact: "environment" } }, // ✅ 핵심
-        {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-        },
-        qrText => {
-            html5QrCode.stop();
-            window.location.href = `/m/move?qr=${encodeURIComponent(qrText)}`;
+  let cameras = [];
+  let camIndex = 0;
+  let running = false;
+
+  const config = { fps: 10, qrbox: { width: 260, height: 260 } };
+
+  function submitText(text){
+    const cleaned = (text || "").trim();
+    if(!cleaned) return;
+    qrtextEl.value = cleaned;
+    formEl.submit();
+  }
+
+  async function stop(){
+    if(running){
+      try{ await qr.stop(); }catch(e){}
+      running = false;
+    }
+  }
+
+  async function startWithFacingMode(){
+    // iOS 대응: 후면 강제 (가능하면 exact)
+    try{
+      await qr.start({ facingMode: { exact: "environment" } }, config, submitText);
+      running = true;
+      return true;
+    }catch(e){
+      // fallback: environment (not exact)
+      try{
+        await qr.start({ facingMode: "environment" }, config, submitText);
+        running = true;
+        return true;
+      }catch(e2){
+        return false;
+      }
+    }
+  }
+
+  async function startWithDeviceId(deviceId){
+    await qr.start({ deviceId: { exact: deviceId } }, config, submitText);
+    running = true;
+  }
+
+  async function start(){
+    await stop();
+
+    // 1) facingMode 우선
+    const ok = await startWithFacingMode();
+    if(ok) return;
+
+    // 2) 카메라 목록 기반 fallback
+    try{
+      cameras = await Html5Qrcode.getCameras();
+      if(!cameras || cameras.length === 0){
+        alert("카메라를 찾을 수 없습니다.");
+        return;
+      }
+      // 후면 추정: label에 back/rear 있으면 우선, 없으면 마지막 카메라를 기본으로
+      let idx = cameras.length - 1;
+      for(let i=0;i<cameras.length;i++){
+        const label = (cameras[i].label || "").toLowerCase();
+        if(label.includes("back") || label.includes("rear")){
+          idx = i; break;
         }
-    ).catch(err => {
-        alert("후면 카메라를 사용할 수 없습니다.\n" + err);
-    });
-</script>
+      }
+      camIndex = idx;
+      await startWithDeviceId(cameras[camIndex].id);
+    }catch(err){
+      alert("카메라 접근 오류: " + err);
+    }
+  }
 
+  toggleBtn.addEventListener("click", async ()=>{
+    try{
+      cameras = cameras && cameras.length ? cameras : await Html5Qrcode.getCameras();
+      if(!cameras || cameras.length < 2){
+        alert("전환할 카메라가 없습니다.");
+        return;
+      }
+      camIndex = (camIndex + 1) % cameras.length;
+      await stop();
+      await startWithDeviceId(cameras[camIndex].id);
+    }catch(e){
+      alert("카메라 전환 실패: " + e);
+    }
+  });
+
+  restartBtn.addEventListener("click", start);
+
+  window.addEventListener("beforeunload", stop);
+
+  start();
+})();
+</script>
 </body>
 </html>

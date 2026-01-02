@@ -1,58 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>재고 QR 조회</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <style>
-        body {
-            margin: 0;
-            padding: 12px;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #111;
-            color: #fff;
-        }
-        #reader {
-            width: 100%;
-        }
-        .hint {
-            text-align: center;
-            margin-top: 12px;
-            font-size: 14px;
-            color: #ccc;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>로케이션 재고</title>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <h2>로케이션 재고</h2>
+    <p class="small">로케이션: <b>{{location}}</b></p>
 
-<h3>재고 QR 스캔</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>브랜드</th>
+          <th>품번</th>
+          <th>품명</th>
+          <th>LOT</th>
+          <th>규격</th>
+          <th>수량</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{r.brand}}</td>
+          <td><a href="/m/inventory/detail?item_code={{r.item_code}}&lot={{r.lot}}&spec={{r.spec}}&brand={{r.brand}}">{{r.item_code}}</a></td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.lot}}</td>
+          <td>{{r.spec}}</td>
+          <td>{{r.qty}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
 
-<div id="reader"></div>
-<div class="hint">📦 후면 카메라로 스캔 중</div>
-
-<script>
-    const html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-        { facingMode: { exact: "environment" } }, // ✅ iOS 강제 후면
-        {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-        },
-        qrText => {
-            html5QrCode.stop();
-            window.location.href = `/m/inventory?qr=${encodeURIComponent(qrText)}`;
-        },
-        errorMessage => {
-            // 스캔 실패 로그 (무시 가능)
-        }
-    ).catch(err => {
-        alert("후면 카메라 접근 실패\n브라우저 권한을 확인하세요.\n" + err);
-    });
-</script>
-
+    <p><a href="/m/qr">← QR</a></p>
+  </div>
+</div>
 </body>
 </html>
