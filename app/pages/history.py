@@ -1,65 +1,61 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from typing import Optional
+import csv
+import io
 
-from app.core.paths import TEMPLATES_DIR
-from app.db import query_history
-from app.utils.excel_export import rows_to_xlsx_bytes
+from app.db import get_db
 
-router = APIRouter(prefix="/page/history", tags=["page-history"])
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+router = APIRouter(prefix="/page/history", tags=["history"])
+templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("", response_class=HTMLResponse)
-def page(
-    request: Request,
-    year: int | None = None,
-    month: int | None = None,
-    day: int | None = None,
-    limit: int = 300,
-):
-    rows = query_history(limit=limit, year=year, month=month, day=day)
+def history_page(request: Request):
     return templates.TemplateResponse(
         "history.html",
-        {
-            "request": request,
-            "rows": rows,
-            "year": year or "",
-            "month": month or "",
-            "day": day or "",
-            "limit": limit,
-        },
+        {"request": request}
     )
 
 
 @router.get("/excel")
-def download_excel(
-    year: int | None = None,
-    month: int | None = None,
-    day: int | None = None,
-    limit: int = 2000,
+def history_excel(
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
+    day: Optional[int] = Query(None),
 ):
-    rows = query_history(limit=limit, year=year, month=month, day=day)
-    columns = [
-        ("created_at", "시간"),
-        ("type", "유형"),
-        ("warehouse", "창고"),
-        ("location", "로케이션"),
-        ("from_location", "출발로케이션"),
-        ("to_location", "도착로케이션"),
-        ("brand", "브랜드"),
-        ("item_code", "품번"),
-        ("item_name", "품명"),
-        ("lot", "LOT"),
-        ("spec", "규격"),
-        ("qty", "수량"),
-        ("note", "비고"),
-        ("operator", "작업자"),
-    ]
-    data = rows_to_xlsx_bytes(rows, columns, sheet_name="이력")
-    filename = "history.xlsx"
+    conn = get_db()
+    cur = conn.cursor()
+
+    sql = "SELECT * FROM history WHERE 1=1"
+    params = []
+
+    if year:
+        sql += " AND strftime('%Y', created_at) = ?"
+        params.append(f"{year:04d}")
+    if month:
+        sql += " AND strftime('%m', created_at) = ?"
+        params.append(f"{month:02d}")
+    if day:
+        sql += " AND strftime('%d', created_at) = ?"
+        params.append(f"{day:02d}")
+
+    sql += " ORDER BY created_at DESC"
+
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([d[0] for d in cur.description])
+    writer.writerows(rows)
+
+    output.seek(0)
     return StreamingResponse(
-        iter([data]),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=history.csv"
+        },
     )
