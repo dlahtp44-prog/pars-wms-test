@@ -11,3 +11,5 @@ COPY . .
 
 # Railway/Render usually provide $PORT. Default 8080.
 CMD ["bash","-lc","uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+
+
