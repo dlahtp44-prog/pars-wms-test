@@ -1,24 +1,55 @@
-from fastapi import APIRouter
-from app.db import query_inventory
+@router.get("/qr")
+def inventory_by_qr(code: str):
+    code = code.strip()  # 🔥 줄바꿈 제거
 
-router = APIRouter(prefix="/api/inventory", tags=["api-inventory"])
+    conn = get_db()
+    cur = conn.cursor()
 
-@router.get("")
-def inventory(
-    warehouse: str = "",
-    location: str = "",
-    brand: str = "",
-    item_code: str = "",
-    lot: str = "",
-    spec: str = "",
-):
-    return {
-        "rows": query_inventory(
-            warehouse=warehouse,
-            location=location,
-            brand=brand,
-            item_code=item_code,
-            lot=lot,
-            spec=spec,
-        )
-    }
+    # 1️⃣ 로케이션 QR 조회
+    cur.execute("""
+        SELECT warehouse, location, item_code, item_name, lot, size, quantity
+        FROM inventory
+        WHERE location = ?
+        ORDER BY item_code, lot, size
+    """, (code,))
+    rows = cur.fetchall()
+
+    if rows:
+        return [
+            {
+                "warehouse": r[0],
+                "location": r[1],
+                "item_code": r[2],
+                "item_name": r[3],
+                "lot": r[4],
+                "spec": r[5],
+                "qty": r[6],
+            }
+            for r in rows
+        ]
+
+    # 2️⃣ 제품 QR (item|lot|spec)
+    try:
+        item_code, lot, spec = code.split("|")
+    except:
+        return []
+
+    cur.execute("""
+        SELECT warehouse, location, item_code, item_name, lot, size, quantity
+        FROM inventory
+        WHERE item_code=? AND lot=? AND size=?
+    """, (item_code, lot, spec))
+
+    rows = cur.fetchall()
+    return [
+        {
+            "warehouse": r[0],
+            "location": r[1],
+            "item_code": r[2],
+            "item_name": r[3],
+            "lot": r[4],
+            "spec": r[5],
+            "qty": r[6],
+        }
+        for r in rows
+    ]
