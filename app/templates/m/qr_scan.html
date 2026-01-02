@@ -5,7 +5,6 @@
     <title>QR 스캔</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- html5-qrcode -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
@@ -32,43 +31,23 @@
 <h3>QR 스캔</h3>
 
 <div id="reader"></div>
-<div class="hint">📷 후면 카메라로 자동 스캔됩니다</div>
+<div class="hint">📷 후면 카메라 사용 중</div>
 
 <script>
     const html5QrCode = new Html5Qrcode("reader");
 
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 }
-    };
-
-    // ✅ 후면 카메라 강제
-    Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras || cameras.length === 0) {
-            alert("카메라를 찾을 수 없습니다.");
-            return;
+    html5QrCode.start(
+        { facingMode: { exact: "environment" } }, // ✅ 핵심
+        {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+        },
+        qrText => {
+            html5QrCode.stop();
+            window.location.href = `/m/move?qr=${encodeURIComponent(qrText)}`;
         }
-
-        // 후면 카메라 우선 선택
-        let cameraId = cameras[0].id;
-        for (const cam of cameras) {
-            if (cam.label.toLowerCase().includes("back") ||
-                cam.label.toLowerCase().includes("rear")) {
-                cameraId = cam.id;
-                break;
-            }
-        }
-
-        html5QrCode.start(
-            { deviceId: { exact: cameraId } },
-            config,
-            qrText => {
-                html5QrCode.stop();
-                window.location.href = `/m/move?qr=${encodeURIComponent(qrText)}`;
-            }
-        );
-    }).catch(err => {
-        alert("카메라 접근 오류: " + err);
+    ).catch(err => {
+        alert("후면 카메라를 사용할 수 없습니다.\n" + err);
     });
 </script>
 
