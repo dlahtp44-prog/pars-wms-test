@@ -34,13 +34,18 @@ const qr = new Html5Qrcode("reader");
 
 Html5Qrcode.getCameras().then((cameras)=>{
   if (!cameras || cameras.length === 0) return;
-  const cameraId = cameras[0].id;
+  // v1.6.4: 후면 카메라 우선 (가능하면 environment/back)
+  const preferred = cameras.find(c => /back|rear|environment/i.test(c.label || ""));
+  const cameraId = (preferred || cameras[cameras.length - 1]).id;
   qr.start(
-    cameraId,
+    { facingMode: "environment" },
     { fps: 10, qrbox: { width: 260, height: 260 } },
     (decodedText) => { qrtext.value = decodedText; },
     () => {}
-  );
+  ).catch(() => {
+    // facingMode가 안 먹는 환경에서는 cameraId로 재시도
+    qr.start(cameraId, { fps: 10, qrbox: { width: 260, height: 260 } }, (decodedText)=>{ qrtext.value = decodedText; }, ()=>{});
+  });
 }).catch(()=>{});
 </script>
 </body>

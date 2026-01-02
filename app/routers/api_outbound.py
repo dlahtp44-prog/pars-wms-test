@@ -7,7 +7,8 @@ router = APIRouter(prefix="/api/outbound", tags=["api-outbound"])
 def outbound(
     warehouse: str = Form(...),
     operator: str = Form(""),
-    brand: str = Form(...),
+    # v1.6.4: 브랜드는 이력/표시용(차감 KEY에서 제외) → 선택 입력
+    brand: str = Form(""),
     location: str = Form(...),
     item_code: str = Form(...),
     item_name: str = Form(...),

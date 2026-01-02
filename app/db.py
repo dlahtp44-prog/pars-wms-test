@@ -35,8 +35,11 @@ def init_db() -> None:
     # migration for older DBs
     _ensure_column(cur, "inventory", "brand", "TEXT NOT NULL DEFAULT ''")
 
-    cur.execute("""CREATE INDEX IF NOT EXISTS idx_inventory_key
-        ON inventory(warehouse, location, brand, item_code, lot, spec)""")
+    # v1.6.4: brand는 '정보 컬럼'으로 유지하되, 재고 증감(차감/이동) KEY에서는 제외
+    # (같은 품번이라도 LOT/규격이 다르면 별도 라인으로 관리)
+    # 기존 DB에 idx_inventory_key(brand 포함)가 있을 수 있으므로 새 인덱스명을 사용
+    cur.execute("""CREATE INDEX IF NOT EXISTS idx_inventory_key_v2
+        ON inventory(warehouse, location, item_code, lot, spec)""")
 
     # history
     cur.execute("""CREATE TABLE IF NOT EXISTS history (
@@ -75,27 +78,32 @@ def upsert_inventory(
     note: str = ""
 ) -> None:
     """재고 증감(입고/출고/이동 공통).
-    KEY: warehouse + location + brand + item_code + lot + spec
+    v1.6.4 KEY: warehouse + location + item_code + lot + spec  (brand는 차감 조건에서 제외)
     """
     now = datetime.now().isoformat(timespec="seconds")
     brand = brand or ""
     conn = get_db()
     cur = conn.cursor()
+    # brand는 WHERE 조건에 사용하지 않음 (운영: 출고 차감 기준에서 제외)
     cur.execute(
-        """SELECT id, qty FROM inventory
-           WHERE warehouse=? AND location=? AND brand=? AND item_code=? AND lot=? AND spec=?""",
-        (warehouse, location, brand, item_code, lot, spec),
+        """SELECT id, qty, brand FROM inventory
+           WHERE warehouse=? AND location=? AND item_code=? AND lot=? AND spec=?""",
+        (warehouse, location, item_code, lot, spec),
     )
     row = cur.fetchone()
     if row:
         new_qty = int(row["qty"]) + int(qty_delta)
         if new_qty < 0:
             raise ValueError("재고 부족")
+        # 기존 brand가 비어있고, 이번 입력에 brand가 들어오면 채워준다.
+        new_brand = row["brand"]
+        if (not new_brand) and brand:
+            new_brand = brand
         cur.execute(
             """UPDATE inventory
-               SET qty=?, item_name=?, note=COALESCE(NULLIF(?,''), note), updated_at=?
+               SET qty=?, brand=?, item_name=?, note=COALESCE(NULLIF(?,''), note), updated_at=?
                WHERE id=?""",
-            (new_qty, item_name, note, now, row["id"]),
+            (new_qty, new_brand, item_name, note, now, row["id"]),
         )
         if new_qty == 0:
             cur.execute("DELETE FROM inventory WHERE id=?", (row["id"],))
@@ -110,6 +118,25 @@ def upsert_inventory(
         )
     conn.commit()
     conn.close()
+
+def get_inventory_qty(
+    warehouse: str,
+    location: str,
+    item_code: str,
+    lot: str,
+    spec: str,
+) -> int:
+    """현재 재고 수량 조회 (brand 제외 KEY 기준)"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT qty FROM inventory
+           WHERE warehouse=? AND location=? AND item_code=? AND lot=? AND spec=?""",
+        (warehouse, location, item_code, lot, spec),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return int(row["qty"]) if row else 0
 
 def add_history(
     type_: str,

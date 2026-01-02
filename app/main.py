@@ -27,7 +27,7 @@ from app.routers.api_inventory import router as api_inventory_router
 from app.routers.api_history import router as api_history_router
 from app.routers.excel_outbound import router as api_excel_outbound_router
 
-app = FastAPI(title="PARS WMS", version="1.6.1-stable")
+app = FastAPI(title="PARS WMS", version="1.6.4-stable")
 
 @app.on_event("startup")
 def _startup():
