@@ -1,13 +1,6 @@
-# PARS WMS v1.6-stable
+## Deploy (Railway / Render)
 
-## Start (local)
-```bash
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+Start Command:
+uvicorn app.main:app --host 0.0.0.0
 
-## Deploy (Railway/Render)
-Start Command (변경 불필요):
-`uvicorn app.main:app --host 0.0.0.0 --port 8080`
-
-DB는 최초 실행 시 자동 생성됩니다.
+※ 포트는 플랫폼에서 자동 할당됩니다.
