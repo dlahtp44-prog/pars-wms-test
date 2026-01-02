@@ -1,203 +1,142 @@
-from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.db import get_db
+from app.core.paths import TEMPLATES_DIR
+from app.db import query_inventory, upsert_inventory, add_history
 
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 router = APIRouter(prefix="/m/move", tags=["mobile-move"])
-templates = Jinja2Templates(directory="app/templates")
 
-
-# ---------------------------
-# 이동 화면 (제품 선택)
-# ---------------------------
 @router.get("", response_class=HTMLResponse)
-def move_page(request: Request):
-    conn = get_db()
-    cur = conn.cursor()
+def start(request: Request):
+    return templates.TemplateResponse("m/move_start.html", {"request": request})
 
-    cur.execute("""
-        SELECT
-            warehouse,
-            location,
-            item_code,
-            item_name,
-            lot,
-            size,
-            quantity
-        FROM inventory
-        WHERE quantity > 0
-        ORDER BY warehouse, location, item_code
-    """)
-    items = cur.fetchall()
-
+@router.get("/from", response_class=HTMLResponse)
+def scan_from(request: Request):
     return templates.TemplateResponse(
-        "mobile/move.html",
+        "m/qr_scan.html",
         {
             "request": request,
-            "items": items
-        }
+            "title": "출발 로케이션 스캔",
+            "desc": "출발 로케이션 QR을 스캔하세요.",
+            "action": "/m/move/from/submit",
+            "hidden": {},
+        },
     )
 
+@router.post("/from/submit")
+def from_submit(qrtext: str = Form(...)):
+    from_location = (qrtext or "").strip()
+    return RedirectResponse(url=f"/m/move/select?from_location={from_location}", status_code=303)
 
-# ---------------------------
-# 이동 처리 (서버 검증)
-# ---------------------------
-@router.post("/submit")
-def move_submit(
+@router.get("/select", response_class=HTMLResponse)
+def select_item(request: Request, from_location: str):
+    rows = query_inventory(location=from_location)
+    return templates.TemplateResponse(
+        "m/move_select.html",
+        {"request": request, "from_location": from_location, "rows": rows},
+    )
+
+@router.post("/select/submit")
+def select_submit(
+    from_location: str = Form(...),
+    picked: str = Form(...),
+    qty: int = Form(...),
+    operator: str = Form(""),
+    note: str = Form(""),
+):
+    parts = picked.split("||")
+    warehouse, brand, item_code, item_name, lot, spec = (parts + [""] * 6)[:6]
+    qs = urlencode(
+        {
+            "warehouse": warehouse,
+            "from_location": from_location,
+            "brand": brand,
+            "item_code": item_code,
+            "item_name": item_name,
+            "lot": lot,
+            "spec": spec,
+            "qty": str(qty),
+            "operator": operator or "",
+            "note": note,
+        }
+    )
+    return RedirectResponse(url=f"/m/move/to?{qs}", status_code=303)
+
+@router.get("/to", response_class=HTMLResponse)
+def scan_to(
+    request: Request,
+    warehouse: str,
+    from_location: str,
+    operator: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty: int,
+    note: str = "",
+):
+    hidden = {
+        "warehouse": warehouse,
+        "from_location": from_location,
+        "brand": brand,
+        "item_code": item_code,
+        "item_name": item_name,
+        "lot": lot,
+        "spec": spec,
+        "qty": str(qty),
+        "operator": operator or "",
+        "note": note or "",
+    }
+    return templates.TemplateResponse(
+        "m/qr_scan.html",
+        {
+            "request": request,
+            "title": "도착 로케이션 스캔",
+            "desc": "도착 로케이션 QR을 스캔하세요.",
+            "action": "/m/move/to/submit",
+            "hidden": hidden,
+        },
+    )
+
+@router.post("/to/submit", response_class=HTMLResponse)
+def to_submit(
+    request: Request,
+    qrtext: str = Form(...),
     warehouse: str = Form(...),
     from_location: str = Form(...),
-    to_location: str = Form(...),
-
+    brand: str = Form(...),
     item_code: str = Form(...),
     item_name: str = Form(...),
     lot: str = Form(...),
-    size: str = Form(...),
-
-    quantity: int = Form(...),
-    worker: str | None = Form(None),   # 추후 로그인으로 대체
+    spec: str = Form(...),
+    qty: int = Form(...),
+    operator: str = Form(""),
+    note: str = Form(""),
 ):
-    if quantity <= 0:
-        raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
+    to_location = (qrtext or "").strip()
 
-    conn = get_db()
-    cur = conn.cursor()
+    # 이동 처리(출발 - / 도착 +)
+    upsert_inventory(warehouse, from_location, brand, item_code, item_name, lot, spec, -int(qty), note)
+    upsert_inventory(warehouse, to_location, brand, item_code, item_name, lot, spec, int(qty), note)
+    add_history("이동", warehouse, operator, brand, item_code, item_name, lot, spec, from_location, to_location, int(qty), note)
 
-    # 현재 재고 조회 (차감 기준)
-    cur.execute("""
-        SELECT quantity
-        FROM inventory
-        WHERE warehouse = ?
-          AND location = ?
-          AND item_code = ?
-          AND item_name = ?
-          AND lot = ?
-          AND size = ?
-    """, (
-        warehouse,
-        from_location,
-        item_code,
-        item_name,
-        lot,
-        size,
-    ))
-
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=400, detail="해당 재고를 찾을 수 없습니다.")
-
-    current_qty = row[0]
-    if quantity > current_qty:
-        raise HTTPException(
-            status_code=400,
-            detail=f"재고 부족 (현재 {current_qty})"
-        )
-
-    # 1️⃣ 출발지 차감
-    cur.execute("""
-        UPDATE inventory
-        SET quantity = quantity - ?
-        WHERE warehouse = ?
-          AND location = ?
-          AND item_code = ?
-          AND item_name = ?
-          AND lot = ?
-          AND size = ?
-    """, (
-        quantity,
-        warehouse,
-        from_location,
-        item_code,
-        item_name,
-        lot,
-        size,
-    ))
-
-    # 2️⃣ 도착지 적재 (있으면 +, 없으면 insert)
-    cur.execute("""
-        SELECT quantity
-        FROM inventory
-        WHERE warehouse = ?
-          AND location = ?
-          AND item_code = ?
-          AND item_name = ?
-          AND lot = ?
-          AND size = ?
-    """, (
-        warehouse,
-        to_location,
-        item_code,
-        item_name,
-        lot,
-        size,
-    ))
-
-    dest = cur.fetchone()
-    if dest:
-        cur.execute("""
-            UPDATE inventory
-            SET quantity = quantity + ?
-            WHERE warehouse = ?
-              AND location = ?
-              AND item_code = ?
-              AND item_name = ?
-              AND lot = ?
-              AND size = ?
-        """, (
-            quantity,
-            warehouse,
-            to_location,
-            item_code,
-            item_name,
-            lot,
-            size,
-        ))
-    else:
-        cur.execute("""
-            INSERT INTO inventory (
-                warehouse, location,
-                item_code, item_name,
-                lot, size,
-                quantity
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            warehouse,
-            to_location,
-            item_code,
-            item_name,
-            lot,
-            size,
-            quantity,
-        ))
-
-    # 3️⃣ 이력 기록
-    cur.execute("""
-        INSERT INTO history (
-            type,
-            warehouse,
-            from_location,
-            to_location,
-            item_code,
-            item_name,
-            lot,
-            size,
-            quantity,
-            worker
-        ) VALUES (
-            'MOVE', ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-    """, (
-        warehouse,
-        from_location,
-        to_location,
-        item_code,
-        item_name,
-        lot,
-        size,
-        quantity,
-        worker,
-    ))
-
-    conn.commit()
-
-    return RedirectResponse("/m", status_code=303)
+    msg = (
+        f"OK\n"
+        f"- 창고: {warehouse}\n"
+        f"- 출발: {from_location}\n"
+        f"- 도착: {to_location}\n"
+        f"- 브랜드: {brand}\n"
+        f"- 품번: {item_code}\n"
+        f"- LOT: {lot}\n"
+        f"- 규격: {spec}\n"
+        f"- 수량: {qty}\n"
+    )
+    return templates.TemplateResponse(
+        "m/move_done.html",
+        {"request": request, "msg": msg, "to_location": to_location},
+    )

@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 
-# v1.6.4: 브랜드는 등록/표시용(차감 KEY 제외) → 엑셀 필수에서 제외
-REQUIRED = ["창고","로케이션","품번","품명","LOT","규격","수량"]
+# v1.6.1: 출고 엑셀 한글 컬럼 고정(운영 안정판)
+REQUIRED = ["창고","로케이션","브랜드","품번","품명","LOT","규격","수량"]
 OPTIONAL = ["비고"]
 
 def normalize_header(s: str) -> str:

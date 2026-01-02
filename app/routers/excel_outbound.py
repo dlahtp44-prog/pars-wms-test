@@ -31,9 +31,9 @@ async def excel_outbound(operator: str = Form(""), file: UploadFile = File(...))
         if row is None or all(v is None or str(v).strip()=="" for v in row):
             continue
         try:
-            # 창고/브랜드(브랜드는 선택)
+            # 창고/브랜드
             warehouse = str(row[idx["창고"]] or "").strip()
-            brand = str(row[idx.get("브랜드", -1)] or "").strip() if idx.get("브랜드", -1) != -1 else ""
+            brand = str(row[idx["브랜드"]] or "").strip()
 
             location = str(row[idx["로케이션"]] or "").strip()
             item_code = str(row[idx["품번"]] or "").strip()
@@ -45,13 +45,13 @@ async def excel_outbound(operator: str = Form(""), file: UploadFile = File(...))
             if "비고" in idx and idx["비고"] < len(row):
                 note = str(row[idx["비고"]] or "").strip()
 
-            if not (warehouse and location and item_code and item_name and lot and spec):
-                raise ValueError("필수 값(창고/로케이션/품번/품명/LOT/규격) 누락")
+            if not (warehouse and brand and location and item_code and item_name and lot and spec):
+                raise ValueError("필수 값(창고/로케이션/브랜드/품번/품명/LOT/규격) 누락")
             qty = int(qty_raw)
             if qty <= 0:
                 raise ValueError("수량은 1 이상")
 
-            upsert_inventory(warehouse, location, brand, item_code, item_name, lot, spec, -qty, note)
+            upsert_inventory(warehouse, location, item_code, item_name, lot, spec, -qty, note)
             add_history("출고", warehouse, operator, brand, item_code, item_name, lot, spec, location, "", qty, note)
             success += 1
         except Exception as e:

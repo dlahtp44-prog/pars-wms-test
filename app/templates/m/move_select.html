@@ -12,10 +12,6 @@
     <h2>제품 선택</h2>
     <p class="small">출발 로케이션: <b>{{from_location}}</b></p>
 
-    {% if err %}
-      <p style="color:#ff4d4f; font-weight:600;">⚠ {{ err }}</p>
-    {% endif %}
-
     {% if rows|length == 0 %}
       <p>해당 로케이션에 재고가 없습니다.</p>
       <p><a href="/m/move/from">← 다시 스캔</a></p>
@@ -23,7 +19,7 @@
       <form method="post" action="/m/move/select/submit">
         <input type="hidden" name="from_location" value="{{from_location}}">
         <label>이동할 품목 선택</label>
-        <select name="picked" id="picked" required>
+        <select name="picked" required>
           {% for r in rows %}
             <option value="{{r.warehouse}}||{{r.brand}}||{{r.item_code}}||{{r.item_name}}||{{r.lot}}||{{r.spec}}">
               [{{r.warehouse}}] {{r.brand}} / {{r.item_code}} / {{r.item_name}} / LOT {{r.lot}} / {{r.spec}} (재고 {{r.qty}})
@@ -32,53 +28,16 @@
         </select>
 
         <label>이동 수량</label>
-        <input name="qty" id="qty" type="number" min="1" step="1" inputmode="numeric" pattern="[0-9]*" required>
-        <p id="qtyHint" class="small"></p>
+        <input name="qty" type="number" min="1" step="1" required>
 
         <label>작업자</label>
-        <!-- v1.6.4: 작업자 이름은 추후 로그인으로 대체 예정 → 임시 선택 입력 -->
-        <input name="operator" type="text" placeholder="예: 홍길동 (선택)">
+        <input name="operator" type="text" placeholder="예: 홍길동" required>
 
         <label>비고</label>
         <input name="note" type="text" placeholder="선택">
 
-        <button id="nextBtn" type="submit">다음: 도착 로케이션 스캔</button>
+        <button type="submit">다음: 도착 로케이션 스캔</button>
       </form>
-
-      <script>
-        // 재고 부족 클라이언트 사전 차단
-        const sel = document.getElementById('picked');
-        const qty = document.getElementById('qty');
-        const hint = document.getElementById('qtyHint');
-        const btn = document.getElementById('nextBtn');
-
-        function parseStockText() {
-          const t = sel.options[sel.selectedIndex].textContent;
-          const m = t.match(/재고\s*(\d+)/);
-          return m ? parseInt(m[1], 10) : 0;
-        }
-
-        function validate() {
-          const stock = parseStockText();
-          const val = parseInt(qty.value || '0', 10);
-          if (val <= 0) {
-            hint.textContent = '수량은 1 이상 입력하세요.';
-            btn.disabled = true;
-            return;
-          }
-          if (val > stock) {
-            hint.textContent = `⚠ 재고 부족: 현재 재고 ${stock} / 입력 ${val}`;
-            btn.disabled = true;
-            return;
-          }
-          hint.textContent = `현재 재고 ${stock} / 이동 ${val}`;
-          btn.disabled = false;
-        }
-
-        sel.addEventListener('change', validate);
-        qty.addEventListener('input', validate);
-        validate();
-      </script>
       <p class="small"><a href="/m/move/from">← 출발 로케이션 다시</a></p>
     {% endif %}
   </div>

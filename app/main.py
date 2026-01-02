@@ -13,6 +13,7 @@ from app.pages.inventory import router as inventory_page_router
 from app.pages.history import router as history_page_router
 from app.pages.excel_outbound import router as excel_outbound_page_router
 
+# mobile pages
 from app.pages.mobile_home import router as mobile_home_router
 from app.pages.mobile_qr import router as mobile_qr_router
 from app.pages.mobile_qr_inventory import router as mobile_qr_inventory_router
@@ -27,13 +28,13 @@ from app.routers.api_inventory import router as api_inventory_router
 from app.routers.api_history import router as api_history_router
 from app.routers.excel_outbound import router as api_excel_outbound_router
 
-app = FastAPI(title="PARS WMS", version="1.6.4-stable")
+app = FastAPI(title="PARS WMS", version="1.6.4")
 
 @app.on_event("startup")
 def _startup():
     init_db()
 
-# static
+# static mount
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # include routers
