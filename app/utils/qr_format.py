@@ -1,20 +1,33 @@
 from typing import Dict, Tuple
 
-QR_KEYS = ["품번","품명","LOT","규격"]
+# 품목 QR 표준 키(최소 필드)
+QR_KEYS_MIN = ["품번","LOT","규격"]
 
-def build_item_qr(item_code: str, item_name: str, lot: str, spec: str) -> str:
-    # 표준 포맷: key=value per line
-    return "\n".join([
+def build_item_qr(item_code: str, item_name: str, lot: str, spec: str, brand: str = "") -> str:
+    """표준 포맷: key=value (줄바꿈 구분)
+    기본: 품번/품명/LOT/규격
+    추가: 브랜드(있으면 포함)
+    """
+    lines=[]
+    if brand:
+        lines.append(f"브랜드={brand}")
+    lines += [
         f"품번={item_code}",
         f"품명={item_name}",
         f"LOT={lot}",
         f"규격={spec}",
-    ])
+    ]
+    return "\n".join(lines)
 
 def parse_qr(text: str) -> Dict[str, str]:
     text = (text or "").strip()
     data: Dict[str,str] = {}
+    if not text:
+        return data
     for line in text.splitlines():
+        line=line.strip()
+        if not line:
+            continue
         if "=" in line:
             k,v = line.split("=",1)
             k=k.strip()
@@ -25,8 +38,8 @@ def parse_qr(text: str) -> Dict[str, str]:
 
 def is_item_qr(text: str) -> bool:
     d=parse_qr(text)
-    return all(k in d and d[k] for k in QR_KEYS)
+    return all(k in d and d[k] for k in QR_KEYS_MIN)
 
-def extract_item_fields(text: str) -> Tuple[str,str,str,str]:
+def extract_item_fields(text: str) -> Tuple[str,str,str,str,str]:
     d=parse_qr(text)
-    return d.get("품번",""), d.get("품명",""), d.get("LOT",""), d.get("규격","")
+    return d.get("브랜드",""), d.get("품번",""), d.get("품명",""), d.get("LOT",""), d.get("규격","")

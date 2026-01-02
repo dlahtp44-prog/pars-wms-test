@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>제품 선택</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>제품 선택</h2>
+    <p class="small">출발 로케이션: <b>{{from_location}}</b></p>
+
+    {% if rows|length == 0 %}
+      <p>해당 로케이션에 재고가 없습니다.</p>
+      <p><a href="/m/move/from">← 다시 스캔</a></p>
+    {% else %}
+      <form method="post" action="/m/move/select/submit">
+        <input type="hidden" name="from_location" value="{{from_location}}">
+        <label>이동할 품목 선택</label>
+        <select name="picked" required>
+          {% for r in rows %}
+            <option value="{{r.warehouse}}||{{r.brand}}||{{r.item_code}}||{{r.item_name}}||{{r.lot}}||{{r.spec}}">
+              [{{r.warehouse}}] {{r.brand}} / {{r.item_code}} / {{r.item_name}} / LOT {{r.lot}} / {{r.spec}} (재고 {{r.qty}})
+            </option>
+          {% endfor %}
+        </select>
+
+        <label>이동 수량</label>
+        <input name="qty" type="number" min="1" step="1" required>
+
+        <label>비고</label>
+        <input name="note" type="text" placeholder="선택">
+
+        <button type="submit">다음: 도착 로케이션 스캔</button>
+      </form>
+      <p class="small"><a href="/m/move/from">← 출발 로케이션 다시</a></p>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

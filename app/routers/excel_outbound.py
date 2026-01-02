@@ -7,7 +7,7 @@ from app.utils.excel_kor_columns import build_col_index, validate_required
 router = APIRouter(prefix="/api/excel/outbound", tags=["excel-outbound"])
 
 @router.post("")
-async def excel_outbound(file: UploadFile = File(...), default_warehouse: str=""):
+async def excel_outbound(file: UploadFile = File(...)):
     """출고 엑셀 업로드 (한글 컬럼 고정)
     필수 컬럼: 로케이션, 품번, 품명, LOT, 규격, 수량
     선택 컬럼: 비고, 창고
@@ -31,12 +31,9 @@ async def excel_outbound(file: UploadFile = File(...), default_warehouse: str=""
         if row is None or all(v is None or str(v).strip()=="" for v in row):
             continue
         try:
-            # 창고 결정
-            warehouse = ""
-            if "창고" in idx and idx["창고"] < len(row):
-                warehouse = str(row[idx["창고"]] or "").strip()
-            if not warehouse:
-                warehouse = (default_warehouse or "기본").strip()
+            # 창고/브랜드
+            warehouse = str(row[idx["창고"]] or "").strip()
+            brand = str(row[idx["브랜드"]] or "").strip()
 
             location = str(row[idx["로케이션"]] or "").strip()
             item_code = str(row[idx["품번"]] or "").strip()
@@ -48,14 +45,14 @@ async def excel_outbound(file: UploadFile = File(...), default_warehouse: str=""
             if "비고" in idx and idx["비고"] < len(row):
                 note = str(row[idx["비고"]] or "").strip()
 
-            if not (location and item_code and item_name and lot and spec):
-                raise ValueError("필수 값(로케이션/품번/품명/LOT/규격) 누락")
+            if not (warehouse and brand and location and item_code and item_name and lot and spec):
+                raise ValueError("필수 값(창고/로케이션/브랜드/품번/품명/LOT/규격) 누락")
             qty = int(qty_raw)
             if qty <= 0:
                 raise ValueError("수량은 1 이상")
 
             upsert_inventory(warehouse, location, item_code, item_name, lot, spec, -qty, note)
-            add_history("출고", warehouse, item_code, item_name, lot, spec, location, "", qty, note)
+            add_history("출고", warehouse, brand, item_code, item_name, lot, spec, location, "", qty, note)
             success += 1
         except Exception as e:
             fail += 1

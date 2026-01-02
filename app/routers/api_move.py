@@ -6,6 +6,7 @@ router = APIRouter(prefix="/api/move", tags=["api-move"])
 @router.post("")
 def move(
     warehouse: str = Form(...),
+    brand: str = Form(...),
     from_location: str = Form(...),
     to_location: str = Form(...),
     item_code: str = Form(...),
@@ -18,7 +19,7 @@ def move(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
     # 빼기/더하기
-    upsert_inventory(warehouse, from_location, item_code, item_name, lot, spec, -qty, note)
-    upsert_inventory(warehouse, to_location, item_code, item_name, lot, spec, qty, note)
-    add_history("이동", warehouse, item_code, item_name, lot, spec, from_location, to_location, qty, note)
+    upsert_inventory(warehouse, from_location, brand, item_code, item_name, lot, spec, -qty, note)
+    upsert_inventory(warehouse, to_location, brand, item_code, item_name, lot, spec, qty, note)
+    add_history("이동", warehouse, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note)
     return {"ok": True}

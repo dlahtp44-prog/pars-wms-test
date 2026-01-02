@@ -15,7 +15,7 @@ def qr_scan(request: Request):
 def qr_submit(qrtext: str = Form(...)):
     qrtext = (qrtext or "").strip()
     if is_item_qr(qrtext):
-        item_code, item_name, lot, spec = extract_item_fields(qrtext)
-        return RedirectResponse(url=f"/m/inventory/detail?item_code={item_code}&lot={lot}&spec={spec}", status_code=302)
+        brand, item_code, item_name, lot, spec = extract_item_fields(qrtext)
+        return RedirectResponse(url=f"/m/inventory/detail?item_code={item_code}&lot={lot}&spec={spec}&brand={brand}", status_code=302)
     # 기본: 로케이션 코드로 간주
     return RedirectResponse(url=f"/m/qr/inventory?location={qrtext}", status_code=302)

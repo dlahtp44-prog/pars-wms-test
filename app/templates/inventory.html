@@ -1,31 +1,59 @@
 <!doctype html>
-<html lang="ko"><head>
+<html lang="ko">
+<head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="stylesheet" href="/static/app.css"/>
   <title>재고조회</title>
-</head><body>
+</head>
+<body>
 <div class="container">
   <div class="card">
     <h2>재고조회</h2>
-    <form method="get" action="/page/inventory" class="grid">
-      <div>
-        <label>로케이션(검색)</label>
-        <input name="location" value="{{location}}" placeholder="예: B01"/>
+
+    <form method="get" action="/page/inventory">
+      <div class="grid2">
+        <div>
+          <label>창고</label>
+          <input name="warehouse" value="{{warehouse or ''}}" placeholder="선택">
+        </div>
+        <div>
+          <label>로케이션</label>
+          <input name="location" value="{{location or ''}}" placeholder="선택">
+        </div>
+        <div>
+          <label>브랜드</label>
+          <input name="brand" value="{{brand or ''}}" placeholder="선택">
+        </div>
+        <div>
+          <label>품번</label>
+          <input name="item_code" value="{{item_code or ''}}" placeholder="부분검색">
+        </div>
+        <div>
+          <label>LOT</label>
+          <input name="lot" value="{{lot or ''}}" placeholder="선택">
+        </div>
+        <div>
+          <label>규격</label>
+          <input name="spec" value="{{spec or ''}}" placeholder="선택">
+        </div>
       </div>
-      <div>
-        <label>품번(검색)</label>
-        <input name="item_code" value="{{item_code}}" placeholder="예: 766109"/>
-      </div>
-      <div style="align-self:end">
-        <button type="submit">검색</button>
-      </div>
+      <button type="submit">조회</button>
     </form>
 
     <table>
       <thead>
         <tr>
-          <th>창고</th><th>로케이션</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th><th>비고</th><th>업데이트</th>
+          <th>창고</th>
+          <th>로케이션</th>
+          <th>브랜드</th>
+          <th>품번</th>
+          <th>품명</th>
+          <th>LOT</th>
+          <th>규격</th>
+          <th>수량</th>
+          <th>비고</th>
+          <th>업데이트</th>
         </tr>
       </thead>
       <tbody>
@@ -33,6 +61,7 @@
         <tr>
           <td>{{r.warehouse}}</td>
           <td>{{r.location}}</td>
+          <td>{{r.brand}}</td>
           <td>{{r.item_code}}</td>
           <td>{{r.item_name}}</td>
           <td>{{r.lot}}</td>
@@ -44,7 +73,9 @@
       {% endfor %}
       </tbody>
     </table>
+
     <p><a href="/">← 메인</a></p>
   </div>
 </div>
-</body></html>
+</body>
+</html>

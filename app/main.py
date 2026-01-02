@@ -12,10 +12,12 @@ from app.pages.move import router as move_page_router
 from app.pages.inventory import router as inventory_page_router
 from app.pages.history import router as history_page_router
 from app.pages.excel_outbound import router as excel_outbound_page_router
+
 from app.pages.mobile_home import router as mobile_home_router
 from app.pages.mobile_qr import router as mobile_qr_router
 from app.pages.mobile_qr_inventory import router as mobile_qr_inventory_router
 from app.pages.mobile_inventory_detail import router as mobile_inventory_detail_router
+from app.pages.mobile_move import router as mobile_move_router
 
 # api
 from app.routers.api_inbound import router as api_inbound_router
@@ -25,7 +27,7 @@ from app.routers.api_inventory import router as api_inventory_router
 from app.routers.api_history import router as api_history_router
 from app.routers.excel_outbound import router as api_excel_outbound_router
 
-app = FastAPI(title="PARS WMS", version="1.6-stable")
+app = FastAPI(title="PARS WMS", version="1.6.1-stable")
 
 @app.on_event("startup")
 def _startup():
@@ -36,6 +38,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # include routers
 app.include_router(index_router)
+
 app.include_router(inbound_page_router)
 app.include_router(outbound_page_router)
 app.include_router(move_page_router)
@@ -47,6 +50,7 @@ app.include_router(mobile_home_router)
 app.include_router(mobile_qr_router)
 app.include_router(mobile_qr_inventory_router)
 app.include_router(mobile_inventory_detail_router)
+app.include_router(mobile_move_router)
 
 app.include_router(api_inbound_router)
 app.include_router(api_outbound_router)

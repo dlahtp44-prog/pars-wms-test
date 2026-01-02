@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from app.core.paths import DB_PATH
 
 def get_db() -> sqlite3.Connection:
@@ -8,29 +8,42 @@ def get_db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+def _ensure_column(cur: sqlite3.Cursor, table: str, col: str, coldef: str) -> None:
+    cur.execute(f"PRAGMA table_info({table})")
+    cols=[r[1] for r in cur.fetchall()]
+    if col not in cols:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coldef}")
+
 def init_db() -> None:
     conn = get_db()
     cur = conn.cursor()
 
+    # inventory
     cur.execute("""CREATE TABLE IF NOT EXISTS inventory (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         warehouse TEXT NOT NULL,
         location TEXT NOT NULL,
+        brand TEXT NOT NULL DEFAULT '',
         item_code TEXT NOT NULL,
         item_name TEXT NOT NULL,
         lot TEXT NOT NULL,
         spec TEXT NOT NULL,
-        qty INTEGER NOT NULL DEFAULT 0,
+        qty INTEGER NOT NULL,
         note TEXT DEFAULT '',
         updated_at TEXT NOT NULL
     )""")
-    cur.execute("""CREATE INDEX IF NOT EXISTS idx_inventory_key
-        ON inventory(warehouse, location, item_code, lot, spec)""")
+    # migration for older DBs
+    _ensure_column(cur, "inventory", "brand", "TEXT NOT NULL DEFAULT ''")
 
+    cur.execute("""CREATE INDEX IF NOT EXISTS idx_inventory_key
+        ON inventory(warehouse, location, brand, item_code, lot, spec)""")
+
+    # history
     cur.execute("""CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL, -- 입고/출고/이동
         warehouse TEXT NOT NULL,
+        brand TEXT NOT NULL DEFAULT '',
         item_code TEXT NOT NULL,
         item_name TEXT NOT NULL,
         lot TEXT NOT NULL,
@@ -41,61 +54,120 @@ def init_db() -> None:
         note TEXT DEFAULT '',
         created_at TEXT NOT NULL
     )""")
+    _ensure_column(cur, "history", "brand", "TEXT NOT NULL DEFAULT ''")
+
     cur.execute("""CREATE INDEX IF NOT EXISTS idx_history_created
         ON history(created_at)""")
 
     conn.commit()
     conn.close()
 
-def upsert_inventory(warehouse: str, location: str, item_code: str, item_name: str, lot: str, spec: str, qty_delta: int, note: str="") -> None:
+def upsert_inventory(
+    warehouse: str,
+    location: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty_delta: int,
+    note: str = ""
+) -> None:
+    """재고 증감(입고/출고/이동 공통).
+    KEY: warehouse + location + brand + item_code + lot + spec
+    """
     now = datetime.now().isoformat(timespec="seconds")
+    brand = brand or ""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""SELECT id, qty FROM inventory
-                   WHERE warehouse=? AND location=? AND item_code=? AND lot=? AND spec=?""",
-                (warehouse, location, item_code, lot, spec))
+    cur.execute(
+        """SELECT id, qty FROM inventory
+           WHERE warehouse=? AND location=? AND brand=? AND item_code=? AND lot=? AND spec=?""",
+        (warehouse, location, brand, item_code, lot, spec),
+    )
     row = cur.fetchone()
     if row:
         new_qty = int(row["qty"]) + int(qty_delta)
         if new_qty < 0:
             raise ValueError("재고 부족")
-        cur.execute("""UPDATE inventory
-                       SET qty=?, item_name=?, note=COALESCE(NULLIF(?,''), note), updated_at=?
-                       WHERE id=?""",
-                    (new_qty, item_name, note, now, row["id"]))
+        cur.execute(
+            """UPDATE inventory
+               SET qty=?, item_name=?, note=COALESCE(NULLIF(?,''), note), updated_at=?
+               WHERE id=?""",
+            (new_qty, item_name, note, now, row["id"]),
+        )
         if new_qty == 0:
             cur.execute("DELETE FROM inventory WHERE id=?", (row["id"],))
     else:
         if int(qty_delta) < 0:
             raise ValueError("재고 부족")
-        cur.execute("""INSERT INTO inventory
-            (warehouse, location, item_code, item_name, lot, spec, qty, note, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?)""",
-            (warehouse, location, item_code, item_name, lot, spec, int(qty_delta), note, now)
+        cur.execute(
+            """INSERT INTO inventory
+            (warehouse, location, brand, item_code, item_name, lot, spec, qty, note, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (warehouse, location, brand, item_code, item_name, lot, spec, int(qty_delta), note, now),
         )
     conn.commit()
     conn.close()
 
-def add_history(type_: str, warehouse: str, item_code: str, item_name: str, lot: str, spec: str,
-                from_location: str, to_location: str, qty: int, note: str="") -> None:
+def add_history(
+    type_: str,
+    warehouse: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    from_location: str,
+    to_location: str,
+    qty: int,
+    note: str = "",
+) -> None:
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""INSERT INTO history
-        (type, warehouse, item_code, item_name, lot, spec, from_location, to_location, qty, note, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-        (type_, warehouse, item_code, item_name, lot, spec, from_location, to_location, int(qty), note, datetime.now().isoformat(timespec="seconds"))
+    cur.execute(
+        """INSERT INTO history
+        (type, warehouse, brand, item_code, item_name, lot, spec, from_location, to_location, qty, note, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            type_,
+            warehouse,
+            brand or "",
+            item_code,
+            item_name,
+            lot,
+            spec,
+            from_location or "",
+            to_location or "",
+            int(qty),
+            note,
+            datetime.now().isoformat(timespec="seconds"),
+        ),
     )
     conn.commit()
     conn.close()
 
-def query_inventory(location: str="", item_code: str="", lot: str="", spec: str="") -> List[Dict[str, Any]]:
+def query_inventory(
+    warehouse: str = "",
+    location: str = "",
+    brand: str = "",
+    item_code: str = "",
+    lot: str = "",
+    spec: str = "",
+) -> List[Dict[str, Any]]:
     conn = get_db()
     cur = conn.cursor()
-    q = "SELECT warehouse, location, item_code, item_name, lot, spec, qty, note, updated_at FROM inventory WHERE 1=1"
-    params=[]
+    q = "SELECT * FROM inventory WHERE 1=1"
+    params: List[Any] = []
+    if warehouse:
+        q += " AND warehouse=?"
+        params.append(warehouse)
     if location:
-        q += " AND location LIKE ?"
-        params.append(f"%{location}%")
+        q += " AND location=?"
+        params.append(location)
+    if brand:
+        q += " AND brand=?"
+        params.append(brand)
     if item_code:
         q += " AND item_code LIKE ?"
         params.append(f"%{item_code}%")
@@ -107,16 +179,14 @@ def query_inventory(location: str="", item_code: str="", lot: str="", spec: str=
         params.append(spec)
     q += " ORDER BY updated_at DESC, location ASC"
     cur.execute(q, params)
-    rows=[dict(r) for r in cur.fetchall()]
+    rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
 
-def query_history(limit: int=200) -> List[Dict[str, Any]]:
-    conn=get_db()
-    cur=conn.cursor()
-    cur.execute("""SELECT type, warehouse, item_code, item_name, lot, spec,
-        from_location, to_location, qty, note, created_at
-        FROM history ORDER BY created_at DESC LIMIT ?""", (int(limit),))
-    rows=[dict(r) for r in cur.fetchall()]
+def query_history(limit: int = 200) -> List[Dict[str, Any]]:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM history ORDER BY created_at DESC LIMIT ?", (int(limit),))
+    rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
