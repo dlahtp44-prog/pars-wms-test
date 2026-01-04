@@ -1,35 +1,38 @@
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
+from app.utils.qr_format import parse_qr
 
-from app.core.paths import TEMPLATES_DIR
-from app.utils.qr_format import detect_qr_type, extract_item_fields, extract_location
+router = APIRouter()
 
-router = APIRouter(prefix="/m/qr", tags=["mobile-qr"])
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+@router.post("/m/qr/submit")
+async def qr_submit(
+    request: Request,
+    qr: str = Form(...)
+):
+    data = parse_qr(qr)
 
+    qr_type = data.get("type", "").upper()
 
-@router.get("", response_class=HTMLResponse)
-def qr_scan(request: Request):
-    return templates.TemplateResponse("m/qr_scan.html", {"request": request})
+    # 로케이션 QR
+    if qr_type in ["LOC", "LOCATION"]:
+        warehouse = data.get("warehouse", "MAIN")
+        location = data.get("location")
 
-
-@router.post("/submit")
-def qr_submit(qrtext: str = Form(...)):
-    qrtext = (qrtext or "").strip()
-
-    qr_type = detect_qr_type(qrtext)
-
-    if qr_type == "ITEM":
-        item_code, item_name, lot, spec = extract_item_fields(qrtext)
         return RedirectResponse(
-            url=f"/m/inventory/detail?item_code={item_code}&lot={lot}&spec={spec}",
+            url=f"/m/qr/inventory?warehouse={warehouse}&location={location}",
             status_code=302
         )
 
-    if qr_type == "LOCATION":
-        loc = extract_location(qrtext) or qrtext
-        return RedirectResponse(url=f"/m/qr/inventory?location={loc}", status_code=302)
+    # 품목 QR (확장 대비)
+    if qr_type in ["ITEM", "PRODUCT"]:
+        item_code = data.get("code")
+        lot = data.get("lot")
+        spec = data.get("spec")
 
-    # UNKNOWN → 그냥 로케이션으로 한번 시도(현장 편의)
-    return RedirectResponse(url=f"/m/qr/inventory?location={qrtext}", status_code=302)
+        return RedirectResponse(
+            url=f"/m/item?item_code={item_code}&lot={lot}&spec={spec}",
+            status_code=302
+        )
+
+    # 알 수 없는 QR
+    return RedirectResponse("/m/qr", status_code=302)
