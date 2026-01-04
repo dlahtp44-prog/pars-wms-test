@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import requests
 
 from app.core.paths import TEMPLATES_DIR
 from app.db import get_db
@@ -10,27 +9,35 @@ router = APIRouter(prefix="/m/move", tags=["mobile-move"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
-# =========================
-# 1️⃣ 출발 로케이션 재고 조회
-# =========================
 @router.get("", response_class=HTMLResponse)
-def move_from_location(request: Request, location: str = ""):
+def move_page(
+    request: Request,
+    location: str = "",
+):
+    """
+    출발 로케이션 기준 재고 목록 표시
+    """
     items = []
 
     if location:
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, item_code, item_name, lot, spec, qty
+            SELECT
+                item_code,
+                item_name,
+                lot,
+                spec,
+                qty
             FROM inventory
             WHERE location = ?
-            ORDER BY item_name
+            ORDER BY item_code
         """, (location,))
         items = cur.fetchall()
         conn.close()
 
     return templates.TemplateResponse(
-        "m/move_from.html",
+        "m/move.html",
         {
             "request": request,
             "location": location,
@@ -39,63 +46,8 @@ def move_from_location(request: Request, location: str = ""):
     )
 
 
-# =========================
-# 2️⃣ 이동 수량 입력
-# =========================
-@router.post("/qty", response_class=HTMLResponse)
-def move_qty(
-    request: Request,
-    from_location: str = Form(...),
-    item_code: str = Form(...),
-    item_name: str = Form(...),
-    lot: str = Form(...),
-    spec: str = Form(...),
-):
-    return templates.TemplateResponse(
-        "m/move_qty.html",
-        {
-            "request": request,
-            "from_location": from_location,
-            "item_code": item_code,
-            "item_name": item_name,
-            "lot": lot,
-            "spec": spec,
-        },
-    )
-
-
-# =========================
-# 3️⃣ 도착 로케이션 QR 대기
-# =========================
-@router.post("/to", response_class=HTMLResponse)
-def move_to_location(
-    request: Request,
-    from_location: str = Form(...),
-    item_code: str = Form(...),
-    item_name: str = Form(...),
-    lot: str = Form(...),
-    spec: str = Form(...),
-    qty: int = Form(...),
-):
-    return templates.TemplateResponse(
-        "m/move_to.html",
-        {
-            "request": request,
-            "from_location": from_location,
-            "item_code": item_code,
-            "item_name": item_name,
-            "lot": lot,
-            "spec": spec,
-            "qty": qty,
-        },
-    )
-
-
-# =========================
-# 4️⃣ 이동 완료
-# =========================
-@router.post("/done")
-def move_done(
+@router.post("/submit")
+def move_submit(
     from_location: str = Form(...),
     to_location: str = Form(...),
     item_code: str = Form(...),
@@ -103,18 +55,65 @@ def move_done(
     spec: str = Form(...),
     qty: int = Form(...),
 ):
-    # 내부 API 호출
-    requests.post(
-        "http://localhost:8080/api/move",
-        json={
-            "from_location": from_location,
-            "to_location": to_location,
-            "item_code": item_code,
-            "lot": lot,
-            "spec": spec,
-            "qty": qty,
-        },
-        timeout=5,
+    if qty <= 0:
+        return {"error": "수량은 1 이상이어야 합니다."}
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # FROM 재고 확인
+    cur.execute("""
+        SELECT id, qty
+        FROM inventory
+        WHERE location=? AND item_code=? AND lot=? AND spec=?
+    """, (from_location, item_code, lot, spec))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return {"error": "출발 로케이션에 재고가 없습니다."}
+
+    inv_id, current_qty = row
+    if current_qty < qty:
+        conn.close()
+        return {"error": "재고 수량이 부족합니다."}
+
+    # FROM 차감
+    cur.execute(
+        "UPDATE inventory SET qty = qty - ? WHERE id = ?",
+        (qty, inv_id)
     )
 
-    return RedirectResponse("/m", status_code=302)
+    # TO 증가 또는 생성
+    cur.execute("""
+        SELECT id FROM inventory
+        WHERE location=? AND item_code=? AND lot=? AND spec=?
+    """, (to_location, item_code, lot, spec))
+    to_row = cur.fetchone()
+
+    if to_row:
+        cur.execute(
+            "UPDATE inventory SET qty = qty + ? WHERE id = ?",
+            (qty, to_row[0])
+        )
+    else:
+        cur.execute("""
+            INSERT INTO inventory
+            (warehouse, location, item_code, item_name, lot, spec, qty)
+            SELECT warehouse, ?, item_code, item_name, lot, spec, ?
+            FROM inventory WHERE id = ?
+        """, (to_location, qty, inv_id))
+
+    # 이력 기록
+    cur.execute("""
+        INSERT INTO history
+        (type, warehouse, item_code, item_name, lot, spec, from_location, to_location, qty)
+        SELECT
+            'MOVE', warehouse, item_code, item_name, lot, spec, ?, ?, ?
+        FROM inventory WHERE id = ?
+    """, (from_location, to_location, qty, inv_id))
+
+    conn.commit()
+    conn.close()
+
+    return {"result": "OK"}
