@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>캘린더 | PARS WMS</title>
+  <style>
+    .cal-wrap{max-width:1200px;margin:24px auto; padding:0 12px;}
+    .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+    .cal-cell{border:1px solid #2a2a2a;border-radius:10px;min-height:92px;padding:8px;background:#111;}
+    .cal-cell .d{font-weight:700;font-size:14px;opacity:.9}
+    .cal-cell .tag{margin-top:6px;font-size:12px;opacity:.8}
+    .cal-cell button{all:unset;cursor:pointer;display:block;width:100%;height:100%;}
+    .cal-side{border:1px solid #2a2a2a;border-radius:12px;background:#0f0f0f;padding:12px;max-width:420px;width:100%;}
+    .layout{display:grid;grid-template-columns:1fr 420px;gap:12px;}
+    @media (max-width: 980px){ .layout{grid-template-columns:1fr;} .cal-side{max-width:none;} }
+    textarea{width:100%; max-width:100%; box-sizing:border-box; resize:none; height:90px; overflow:auto;}
+    .memo-item{border:1px solid #2a2a2a;border-radius:10px;padding:10px;margin-top:8px;}
+    .memo-meta{font-size:12px;opacity:.75;margin-bottom:6px;}
+  </style>
+</head>
+<body>
+<div class="cal-wrap">
+  <div class="cal-head">
+    <div>
+      <h2 style="margin:0;">📅 캘린더 메모</h2>
+      <div class="small">로그인: <b>{{ user.username }}</b> (<a href="/logout">로그아웃</a>)</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <a class="btn" href="/page/calendar?year={{ prev_y }}&month={{ prev_m }}">◀ 이전달</a>
+      <div style="min-width:160px;text-align:center;font-weight:700;">{{ year }}-{{ "%02d"|format(month) }}</div>
+      <a class="btn" href="/page/calendar?year={{ next_y }}&month={{ next_m }}">다음달 ▶</a>
+      <a class="btn" href="/">홈</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="cal-grid" style="margin-bottom:8px; opacity:.85;">
+        <div class="small">일</div><div class="small">월</div><div class="small">화</div><div class="small">수</div><div class="small">목</div><div class="small">금</div><div class="small">토</div>
+      </div>
+
+      <div class="cal-grid">
+        {% for week in grid %}
+          {% for d in week %}
+            {% if d == 0 %}
+              <div class="cal-cell" style="opacity:.35;"></div>
+            {% else %}
+              {% set ds = year|string + "-" + ("%02d"|format(month)) + "-" + ("%02d"|format(d)) %}
+              <div class="cal-cell" data-date="{{ ds }}">
+                <button type="button" onclick="selectDate('{{ ds }}')">
+                  <div class="d">{{ d }}</div>
+                  {% if counts.get(ds) %}
+                    <div class="tag">📝 메모 {{ counts.get(ds) }}건</div>
+                  {% else %}
+                    <div class="tag" style="opacity:.55;">메모 없음</div>
+                  {% endif %}
+                </button>
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="cal-side">
+      <h3 style="margin-top:0;">선택 날짜</h3>
+      <div id="selDate" style="font-weight:700;">(날짜를 클릭하세요)</div>
+
+      <div style="margin-top:10px;">
+        <label class="small">메모 추가</label>
+        <textarea id="memoText" placeholder="메모를 입력하세요. (박스는 가로로 늘어나지 않습니다)"></textarea>
+        <button onclick="saveMemo()" style="margin-top:8px;">저장</button>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="margin:0;">메모 목록</h3>
+          <button type="button" onclick="refreshMemos()">새로고침</button>
+        </div>
+        <div id="memoList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentDate = "";
+
+  function selectDate(ds){
+    currentDate = ds;
+    document.getElementById("selDate").textContent = ds;
+    document.getElementById("memoText").value = "";
+    refreshMemos();
+  }
+
+  async function refreshMemos(){
+    const list = document.getElementById("memoList");
+    list.innerHTML = "";
+    if(!currentDate) return;
+
+    const res = await fetch(`/api/calendar/memos?memo_date=${encodeURIComponent(currentDate)}`);
+    if(!res.ok){
+      list.innerHTML = "<div class='small'>로그인이 필요하거나 오류가 발생했습니다.</div>";
+      return;
+    }
+    const data = await res.json();
+    if(!data.length){
+      list.innerHTML = "<div class='small'>메모가 없습니다.</div>";
+      return;
+    }
+    for(const m of data){
+      const div = document.createElement("div");
+      div.className = "memo-item";
+      div.innerHTML = `
+        <div class="memo-meta">작성: <b>${escapeHtml(m.created_by)}</b> / ${escapeHtml(m.created_at)}</div>
+        <div style="white-space:pre-wrap; word-break:break-word;">${escapeHtml(m.content)}</div>
+      `;
+      list.appendChild(div);
+    }
+  }
+
+  async function saveMemo(){
+    if(!currentDate){
+      alert("날짜를 먼저 선택하세요.");
+      return;
+    }
+    const text = document.getElementById("memoText").value.trim();
+    if(!text){
+      alert("메모를 입력하세요.");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("memo_date", currentDate);
+    fd.append("content", text);
+
+    const res = await fetch("/api/calendar/memos", { method:"POST", body: fd });
+    if(!res.ok){
+      alert("저장 실패: 로그인 상태를 확인하세요.");
+      return;
+    }
+    alert("저장 완료");
+    window.location.reload(); // counts 갱신을 위해 리로드
+  }
+
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+</script>
+</body>
+</html>
