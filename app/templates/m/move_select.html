@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>재고 이동</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<h3>FROM: {{ location }}</h3>
+
+<table>
+<thead>
+<tr>
+  <th>품번</th><th>LOT</th><th>규격</th><th>수량</th><th></th>
+</tr>
+</thead>
+<tbody id="rows"></tbody>
+</table>
+
+<script>
+async function load() {
+  const res = await fetch(`/api/inventory?location={{ location }}`);
+  const data = await res.json();
+  const tbody = document.getElementById("rows");
+  tbody.innerHTML = "";
+
+  data.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.item_code}</td>
+      <td>${r.lot}</td>
+      <td>${r.spec}</td>
+      <td>${r.qty}</td>
+      <td>
+        <input type="number" min="1" max="${r.qty}" inputmode="numeric" id="q_${r.id}">
+        <button onclick="next('${r.item_code}','${r.lot}','${r.spec}', ${r.qty}, 'q_${r.id}')">선택</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function next(item, lot, spec, maxQty, qid) {
+  const qty = Number(document.getElementById(qid).value);
+  if (!qty || qty <= 0) return alert("수량 입력");
+  if (qty > maxQty) return alert("재고 부족");
+
+  const qs = new URLSearchParams({
+    from: "{{ location }}",
+    item, lot, spec, qty
+  });
+  location.href = `/m/move/to?${qs.toString()}`;
+}
+
+load();
+</script>
+</body>
+</html>
