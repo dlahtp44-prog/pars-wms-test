@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>로케이션 재고</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>로케이션 재고: {{location}}</h2>
+    <table>
+      <thead>
+        <tr><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{r.item_code}}</td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.lot}}</td>
+          <td>{{r.spec}}</td>
+          <td>{{r.qty}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="/m/qr">← QR</a></p>
+  </div>
+</div>
+</body></html>

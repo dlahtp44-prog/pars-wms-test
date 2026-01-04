@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>재고 상세</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>재고 상세</h2>
+    <p class="small">품번: <b>{{item_code}}</b> / LOT: <b>{{lot}}</b> / 규격: <b>{{spec}}</b></p>
+
+    <div class="card">
+      <div class="small">표준 QR 텍스트</div>
+      <pre style="white-space:pre-wrap">{{qr}}</pre>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>창고</th><th>로케이션</th><th>품명</th><th>수량</th><th>비고</th><th>업데이트</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{r.warehouse}}</td>
+          <td>{{r.location}}</td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.qty}}</td>
+          <td>{{r.note}}</td>
+          <td class="small">{{r.updated_at}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <p><a href="/m/qr">← QR</a></p>
+  </div>
+</div>
+</body></html>
