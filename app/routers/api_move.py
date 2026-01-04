@@ -1,24 +1,45 @@
 from fastapi import APIRouter, Form, HTTPException
-from app.db import upsert_inventory, add_history
+from app.db import get_db
 
-router = APIRouter(prefix="/api/move", tags=["api-move"])
+router = APIRouter(prefix="/api", tags=["move"])
 
-@router.post("")
+@router.post("/move")
 def move(
     warehouse: str = Form(...),
     from_location: str = Form(...),
     to_location: str = Form(...),
     item_code: str = Form(...),
-    item_name: str = Form(...),
     lot: str = Form(...),
-    spec: str = Form(...),
     qty: int = Form(...),
     note: str = Form("")
 ):
     if qty <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
-    # 빼기/더하기
-    upsert_inventory(warehouse, from_location, item_code, item_name, lot, spec, -qty, note)
-    upsert_inventory(warehouse, to_location, item_code, item_name, lot, spec, qty, note)
-    add_history("이동", warehouse, item_code, item_name, lot, spec, from_location, to_location, qty, note)
-    return {"ok": True}
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 출발지 차감
+    cur.execute("""
+        UPDATE inventory
+        SET qty = qty - ?
+        WHERE warehouse=? AND location=? AND item_code=? AND lot=?
+    """, (qty, warehouse, from_location, item_code, lot))
+
+    # 도착지 증가
+    cur.execute("""
+        INSERT INTO inventory (warehouse, location, item_code, lot, qty)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(warehouse, location, item_code, lot)
+        DO UPDATE SET qty = qty + excluded.qty
+    """, (warehouse, to_location, item_code, lot, qty))
+
+    # 이력 기록
+    cur.execute("""
+        INSERT INTO history
+        (warehouse, from_location, to_location, item_code, lot, qty, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (warehouse, from_location, to_location, item_code, lot, qty, note))
+
+    conn.commit()
+    return {"status": "ok"}
