@@ -1,44 +1,84 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>모바일 메뉴</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/app.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            background: #0d0f14;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+        }
+        h2 {
+            margin-bottom: 16px;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .menu-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 56px;
+            border-radius: 12px;
+            background: #151922;
+            color: #4da3ff;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            border: 1px solid #222;
+        }
+        .menu-button.full {
+            grid-column: span 2;
+        }
+        .hint {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #9aa4b2;
+            line-height: 1.5;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h2>모바일 메뉴</h2>
 
-<div class="container">
-    <h2>모바일 메뉴</h2>
+        <div class="menu-grid">
+            <!-- 공용 QR 스캔 (재고 조회용) -->
+            <a href="/m/qr" class="menu-button">
+                📷 QR 스캔
+            </a>
 
-    <div class="grid">
-        <!-- 공용 QR (재고조회/분기) -->
-        <a class="card" href="/m/qr">
-            📷 QR 스캔<br>
-            <small>재고조회 / 공용</small>
-        </a>
+            <!-- 🔥 QR 이동 (신규 추가) -->
+            <a href="/m/qr?mode=move" class="menu-button">
+                📦 QR 이동
+            </a>
 
-        <!-- 🔥 추가: 이동 전용 QR -->
-        <a class="card" href="/m/qr?mode=move">
-            📦 QR 이동<br>
-            <small>로케이션 → 로케이션</small>
-        </a>
+            <!-- PC형 재고조회 -->
+            <a href="/page/inventory" class="menu-button">
+                📋 재고조회(PC형)
+            </a>
 
-        <!-- PC형 재고조회 -->
-        <a class="card" href="/page/inventory">
-            📊 재고조회(PC형)
-        </a>
+            <!-- 메인 -->
+            <a href="/" class="menu-button full">
+                ⬅ 메인
+            </a>
+        </div>
 
-        <!-- 메인 -->
-        <a class="card" href="/">
-            🏠 메인
-        </a>
+        <div class="hint">
+            QR 스캔은 로케이션 QR 또는 품목 QR(품번/LOT/규격 포함)을 지원합니다.<br>
+            QR 이동은 <b>출발 로케이션 → 도착 로케이션</b> 순서로 진행됩니다.
+        </div>
     </div>
-
-    <p class="hint">
-        QR 이동은 <b>출발 로케이션 → 도착 로케이션</b> 순서로 진행됩니다.
-    </p>
-</div>
-
 </body>
 </html>
