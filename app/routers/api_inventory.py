@@ -26,7 +26,6 @@ def get_inventory(
             id,
             warehouse,
             location,
-            brand,
             item_code,
             item_name,
             lot,
@@ -41,9 +40,15 @@ def get_inventory(
     cur.execute(sql, params + [limit])
     rows = cur.fetchall()
 
-    cols = [
-        "id", "warehouse", "location", "brand",
-        "item_code", "item_name", "lot", "spec", "qty"
+    columns = [
+        "id",
+        "warehouse",
+        "location",
+        "item_code",
+        "item_name",
+        "lot",
+        "spec",
+        "qty",
     ]
 
-    return [dict(zip(cols, r)) for r in rows]
+    return [dict(zip(columns, row)) for row in rows]
