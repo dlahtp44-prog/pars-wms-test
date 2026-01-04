@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>재고조회</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>재고조회</h2>
+    <form method="get" action="/page/inventory" class="grid">
+      <div>
+        <label>로케이션(검색)</label>
+        <input name="location" value="{{location}}" placeholder="예: B01"/>
+      </div>
+      <div>
+        <label>품번(검색)</label>
+        <input name="item_code" value="{{item_code}}" placeholder="예: 766109"/>
+      </div>
+      <div style="align-self:end">
+        <button type="submit">검색</button>
+      </div>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>창고</th><th>로케이션</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th><th>비고</th><th>업데이트</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{r.warehouse}}</td>
+          <td>{{r.location}}</td>
+          <td>{{r.item_code}}</td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.lot}}</td>
+          <td>{{r.spec}}</td>
+          <td>{{r.qty}}</td>
+          <td>{{r.note}}</td>
+          <td class="small">{{r.updated_at}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="/">← 메인</a></p>
+  </div>
+</div>
+</body></html>

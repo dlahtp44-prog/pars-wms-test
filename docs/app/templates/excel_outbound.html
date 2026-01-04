@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>출고 엑셀 업로드</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>출고 엑셀 업로드 (한글 컬럼 고정)</h2>
+    <p class="small">필수 컬럼: 로케이션, 품번, 품명, LOT, 규격, 수량 / 선택: 비고, 창고</p>
+    <form id="f" enctype="multipart/form-data">
+      <label>기본 창고(엑셀에 '창고' 컬럼 없을 때 사용)</label>
+      <input name="default_warehouse" placeholder="예: 서이천 (미입력 시 '기본')"/>
+      <label>엑셀 파일(.xlsx)</label>
+      <input type="file" name="file" accept=".xlsx,.xlsm,.xltx,.xltm" required/>
+      <button type="submit">업로드</button>
+    </form>
+    <pre id="out" class="card" style="white-space:pre-wrap"></pre>
+    <p><a href="/">← 메인</a></p>
+  </div>
+</div>
+<script>
+const f=document.getElementById('f');
+const out=document.getElementById('out');
+f.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  out.textContent='처리중...';
+  const fd=new FormData(f);
+  const res=await fetch('/api/excel/outbound', {method:'POST', body:fd});
+  const txt=await res.text();
+  out.textContent=txt;
+});
+</script>
+</body></html>
