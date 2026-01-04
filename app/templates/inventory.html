@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>재고조회</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>재고조회</h2>
+
+    <form method="get" action="/page/inventory" class="grid2">
+      <div>
+        <label>창고</label>
+        <input name="warehouse" value="{{ filters.warehouse }}"/>
+      </div>
+      <div>
+        <label>로케이션</label>
+        <input name="location" value="{{ filters.location }}"/>
+      </div>
+      <div>
+        <label>품번</label>
+        <input name="item_code" value="{{ filters.item_code }}"/>
+      </div>
+      <div>
+        <label>LOT</label>
+        <input name="lot" value="{{ filters.lot }}"/>
+      </div>
+      <div>
+        <label>규격</label>
+        <input name="spec" value="{{ filters.spec }}"/>
+      </div>
+      <div>
+        <label>표시건수(최대 500)</label>
+        <input name="limit" type="number" value="{{ filters.limit }}"/>
+      </div>
+      <div style="grid-column:1/-1; display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="submit">검색</button>
+        <a class="btn" href="/page/inventory/excel?warehouse={{filters.warehouse}}&location={{filters.location}}&item_code={{filters.item_code}}&lot={{filters.lot}}&spec={{filters.spec}}">엑셀 다운로드</a>
+        <a class="btn" href="/page/excel">엑셀 센터</a>
+        <a class="btn" href="/">메인</a>
+      </div>
+    </form>
+
+    <div style="overflow:auto; margin-top:14px;">
+      <table>
+        <thead>
+          <tr>
+            <th>창고</th><th>로케이션</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th><th>비고</th><th>updated_at</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{r[0]}}</td><td>{{r[1]}}</td><td>{{r[2]}}</td><td>{{r[3]}}</td><td>{{r[4]}}</td><td>{{r[5]}}</td><td style="text-align:right;">{{r[6]}}</td><td>{{r[7]}}</td><td>{{r[8]}}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</body></html>

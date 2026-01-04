@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>달력 메모</title>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <style>
+    .cal-wrap { max-width: 980px; margin: 0 auto; }
+    .cal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .cal-head h2 { margin:0; font-size:18px; }
+    .cal-grid { display:grid; grid-template-columns: repeat(7, 1fr); gap:8px; }
+    .cal-dow, .cal-cell { border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding:10px; min-height:84px; }
+    .cal-dow { min-height:auto; text-align:center; font-weight:600; color:#b7c7ff; }
+    .cal-cell { cursor:pointer; position:relative; overflow:hidden; }
+    .cal-cell .day { font-weight:700; opacity:0.9; }
+    .cal-cell .memo { margin-top:8px; font-size:12px; line-height:1.35; color:#d6d6d6; white-space: pre-wrap; display:-webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow:hidden; }
+    .cal-cell.today { outline: 2px solid rgba(127, 168, 255, 0.6); }
+    .cal-cell.hasmemo::after { content:''; position:absolute; top:10px; right:10px; width:8px; height:8px; border-radius:99px; background:#7aa6ff; }
+    .modal-back { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:none; align-items:center; justify-content:center; padding:16px; }
+    .modal { width:min(720px, 100%); background:#0f131b; border:1px solid rgba(255,255,255,0.10); border-radius:16px; padding:16px; }
+    .modal .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .modal textarea { width:100%; min-height:140px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; padding:12px; resize:vertical; }
+    .btn { cursor:pointer; border-radius:12px; padding:10px 12px; border:1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color:#fff; }
+    .btn.primary { background:#2b67ff; border-color:#2b67ff; }
+    .btn.danger { background: rgba(255,80,80,0.18); border-color: rgba(255,80,80,0.35); }
+    .hint { font-size:12px; color:#bdbdbd; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="container cal-wrap">
+    <div class="topbar">
+      <a class="btn" href="/">← 메인</a>
+      <div style="flex:1"></div>
+      <a class="btn" href="/page/history">이력</a>
+      <a class="btn" href="/page/inventory">재고조회</a>
+    </div>
+
+    <div class="cal-head">
+      <button class="btn" id="prevBtn">◀</button>
+      <h2 id="title">달력</h2>
+      <button class="btn" id="nextBtn">▶</button>
+    </div>
+
+    <div class="cal-grid" id="dow">
+      <div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>
+    </div>
+    <div class="cal-grid" id="grid" style="margin-top:8px;"></div>
+    <div class="hint">※ 날짜 클릭 → 메모 저장 (공유용). 달이 넘어가도 메모는 DB에 남습니다.</div>
+  </div>
+
+  <div class="modal-back" id="modalBack">
+    <div class="modal">
+      <div class="row">
+        <div>
+          <div style="font-weight:700" id="modalDate">날짜</div>
+          <div class="hint">비워서 저장하면 해당 날짜 메모가 삭제됩니다.</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn danger" id="deleteBtn">삭제</button>
+          <button class="btn" id="closeBtn">닫기</button>
+          <button class="btn primary" id="saveBtn">저장</button>
+        </div>
+      </div>
+      <div style="height:10px;"></div>
+      <textarea id="memoText" placeholder="메모 입력..."></textarea>
+    </div>
+  </div>
+
+<script>
+  const pad2 = (n) => String(n).padStart(2,'0');
+  const fmtDate = (y,m,d) => `${y}-${pad2(m)}-${pad2(d)}`;
+
+  let now = new Date();
+  let curY = now.getFullYear();
+  let curM = now.getMonth() + 1;
+
+  let memos = {}; // date -> text
+  let selectedDate = null;
+
+  const grid = document.getElementById('grid');
+  const title = document.getElementById('title');
+
+  async function loadMonth(y, m) {
+    title.textContent = `${y}년 ${m}월 (메모 달력)`;
+    const res = await fetch(`/api/calendar/month?year=${y}&month=${m}`);
+    const data = await res.json();
+    memos = data.memos || {};
+    render(y,m);
+  }
+
+  function render(y,m){
+    grid.innerHTML = '';
+    const first = new Date(y, m-1, 1);
+    const startDow = first.getDay(); // 0=Sun
+    const lastDay = new Date(y, m, 0).getDate();
+
+    // 앞쪽 빈칸
+    for(let i=0;i<startDow;i++){
+      const cell = document.createElement('div');
+      cell.className='cal-cell';
+      cell.style.opacity='0.25';
+      grid.appendChild(cell);
+    }
+
+    for(let d=1; d<=lastDay; d++){
+      const dateStr = fmtDate(y,m,d);
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      if (memos[dateStr]) cell.classList.add('hasmemo');
+
+      const today = new Date();
+      if (y===today.getFullYear() && m===today.getMonth()+1 && d===today.getDate()){
+        cell.classList.add('today');
+      }
+
+      cell.innerHTML = `
+        <div class="day">${d}</div>
+        <div class="memo">${(memos[dateStr]||'').replace(/</g,'&lt;')}</div>
+      `;
+      cell.addEventListener('click', ()=>openModal(dateStr, memos[dateStr]||''));
+      grid.appendChild(cell);
+    }
+  }
+
+  const modalBack = document.getElementById('modalBack');
+  const modalDate = document.getElementById('modalDate');
+  const memoText = document.getElementById('memoText');
+
+  function openModal(dateStr, text){
+    selectedDate = dateStr;
+    modalDate.textContent = dateStr;
+    memoText.value = text;
+    modalBack.style.display = 'flex';
+    memoText.focus();
+  }
+  function closeModal(){
+    modalBack.style.display = 'none';
+    selectedDate = null;
+  }
+
+  document.getElementById('closeBtn').addEventListener('click', closeModal);
+  modalBack.addEventListener('click', (e)=>{ if(e.target===modalBack) closeModal(); });
+
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    if(!selectedDate) return;
+    const payload = { memo_date: selectedDate, memo_text: memoText.value || "" };
+    await fetch('/api/calendar/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    await loadMonth(curY, curM);
+    closeModal();
+  });
+
+  document.getElementById('deleteBtn').addEventListener('click', async ()=>{
+    if(!selectedDate) return;
+    const payload = { memo_date: selectedDate, memo_text: "" };
+    await fetch('/api/calendar/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    await loadMonth(curY, curM);
+    closeModal();
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', async ()=>{
+    curM -= 1;
+    if(curM<=0){ curM=12; curY -= 1; }
+    await loadMonth(curY, curM);
+  });
+  document.getElementById('nextBtn').addEventListener('click', async ()=>{
+    curM += 1;
+    if(curM>=13){ curM=1; curY += 1; }
+    await loadMonth(curY, curM);
+  });
+
+  loadMonth(curY, curM);
+</script>
+</body>
+</html>

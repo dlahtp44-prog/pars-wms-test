@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>이력조회</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>이력조회</h2>
+
+    <div class="grid2">
+      <div>
+        <label>연(YYYY)</label>
+        <input id="y" type="number" placeholder="예: 2026"/>
+      </div>
+      <div>
+        <label>월(1-12)</label>
+        <input id="m" type="number" placeholder="예: 1"/>
+      </div>
+      <div>
+        <label>일(1-31)</label>
+        <input id="d" type="number" placeholder="예: 4"/>
+      </div>
+      <div>
+        <label>표시건수(기본 200)</label>
+        <input id="limit" type="number" value="{{limit}}"/>
+      </div>
+      <div style="grid-column:1/-1; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn" href="#" id="excelBtn">엑셀 다운로드</a>
+        <a class="btn" href="/page/excel">엑셀 센터</a>
+        <a class="btn" href="/">메인</a>
+      </div>
+    </div>
+
+    <div style="overflow:auto; margin-top:14px;">
+      <table>
+        <thead>
+          <tr>
+            <th>id</th><th>created_at</th><th>type</th><th>창고</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>FROM</th><th>TO</th><th>수량</th><th>비고</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{r[0]}}</td><td>{{r[1]}}</td><td>{{r[2]}}</td><td>{{r[3]}}</td><td>{{r[4]}}</td><td>{{r[5]}}</td><td>{{r[6]}}</td><td>{{r[7]}}</td><td>{{r[8]}}</td><td>{{r[9]}}</td><td style="text-align:right;">{{r[10]}}</td><td>{{r[11]}}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('excelBtn').addEventListener('click', (e)=>{
+  e.preventDefault();
+  const y = document.getElementById('y').value;
+  const m = document.getElementById('m').value;
+  const d = document.getElementById('d').value;
+  const limit = document.getElementById('limit').value || '';
+  const qs = new URLSearchParams();
+  if(y) qs.set('year', y);
+  if(m) qs.set('month', m);
+  if(d) qs.set('day', d);
+  if(limit) qs.set('limit', limit);
+  window.location.href = '/page/history/excel?' + qs.toString();
+});
+</script>
+
+</body></html>
