@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>품목 선택</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>2) 품목 선택</h2>
+    <p class="small">출발 로케이션: <b>{{from_location}}</b></p>
+
+    {% if rows|length == 0 %}
+      <p class="error">해당 로케이션에 재고가 없습니다.</p>
+    {% else %}
+      <table>
+        <thead>
+          <tr>
+            <th>창고</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{r.warehouse}}</td>
+            <td>{{r.item_code}}</td>
+            <td>{{r.item_name}}</td>
+            <td>{{r.lot}}</td>
+            <td>{{r.spec}}</td>
+            <td>{{r.qty}}</td>
+            <td>
+              <form method="post" action="/m/move/select/submit">
+                <input type="hidden" name="warehouse" value="{{r.warehouse}}"/>
+                <input type="hidden" name="from_location" value="{{from_location}}"/>
+                <input type="hidden" name="item_code" value="{{r.item_code}}"/>
+                <input type="hidden" name="item_name" value="{{r.item_name}}"/>
+                <input type="hidden" name="lot" value="{{r.lot}}"/>
+                <input type="hidden" name="spec" value="{{r.spec}}"/>
+                <input type="hidden" name="available_qty" value="{{r.qty}}"/>
+                <button type="submit">선택</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <p><a href="/m/move/from">← 출발 로케이션 다시</a></p>
+  </div>
+</div>
+</body></html>

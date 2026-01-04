@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>출발 로케이션 스캔</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>1) 출발 로케이션 QR</h2>
+    {% if error %}
+      <p class="error">{{error}}</p>
+    {% endif %}
+    <div id="reader" style="width:100%"></div>
+
+    <form id="f" method="post" action="/m/move/from/submit">
+      <label>스캔 결과</label>
+      <input id="qrtext" name="qrtext" placeholder="스캔되면 자동 입력" required/>
+      <button type="submit">다음</button>
+    </form>
+
+    <p class="small">권장 로케이션 QR: PARS|TYPE=LOCATION|CODE=D01-01</p>
+    <p><a href="/m/move">← QR 이동</a></p>
+  </div>
+</div>
+
+<script>
+const qr = new Html5Qrcode("reader");
+const qrtext = document.getElementById("qrtext");
+Html5Qrcode.getCameras().then(cameras => {
+  if (!cameras || cameras.length === 0) return;
+  const cameraId = cameras[0].id;
+  qr.start(
+    cameraId,
+    { fps: 10, qrbox: { width: 260, height: 260 } },
+    (decodedText) => {
+      qrtext.value = decodedText;
+    },
+    () => {}
+  );
+}).catch(()=>{});
+</script>
+</body></html>
