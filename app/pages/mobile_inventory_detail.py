@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.core.paths import TEMPLATES_DIR
-from app.db import query_inventory
-from app.utils.qr_format import build_item_qr
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+router = APIRouter(prefix="/m", tags=["Mobile Inventory"])
+templates = Jinja2Templates(directory="app/templates")
 
-@router.get("/m/inventory/detail", response_class=HTMLResponse)
-def detail(request: Request, item_code: str, lot: str, spec: str):
-    rows = query_inventory(item_code=item_code, lot=lot, spec=spec)
-    qr = build_item_qr(item_code, rows[0]["item_name"] if rows else "", lot, spec)
-    return templates.TemplateResponse("m/inventory_detail.html", {"request": request, "rows": rows, "item_code": item_code, "lot": lot, "spec": spec, "qr": qr})
+
+@router.get("/inventory")
+def mobile_inventory(request: Request, qr: str):
+    return templates.TemplateResponse(
+        "mobile/inventory_detail.html",
+        {
+            "request": request,
+            "location": qr.strip()
+        }
+    )
