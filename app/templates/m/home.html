@@ -1,19 +1,44 @@
-<!doctype html>
-<html lang="ko"><head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link rel="stylesheet" href="/static/app.css"/>
-  <title>모바일</title>
-</head><body>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>모바일 메뉴</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
 <div class="container">
-  <div class="card">
     <h2>모바일 메뉴</h2>
+
     <div class="grid">
-      <a class="card" href="/m/qr">QR 스캔</a>
-      <a class="card" href="/page/inventory">재고조회(PC형)</a>
-      <a class="card" href="/">메인</a>
+        <!-- 공용 QR (재고조회/분기) -->
+        <a class="card" href="/m/qr">
+            📷 QR 스캔<br>
+            <small>재고조회 / 공용</small>
+        </a>
+
+        <!-- 🔥 추가: 이동 전용 QR -->
+        <a class="card" href="/m/qr?mode=move">
+            📦 QR 이동<br>
+            <small>로케이션 → 로케이션</small>
+        </a>
+
+        <!-- PC형 재고조회 -->
+        <a class="card" href="/page/inventory">
+            📊 재고조회(PC형)
+        </a>
+
+        <!-- 메인 -->
+        <a class="card" href="/">
+            🏠 메인
+        </a>
     </div>
-    <p class="small">QR 스캔은 로케이션 QR 또는 품목 QR(품번/품명/LOT/규격 포함)을 지원합니다.</p>
-  </div>
+
+    <p class="hint">
+        QR 이동은 <b>출발 로케이션 → 도착 로케이션</b> 순서로 진행됩니다.
+    </p>
 </div>
-</body></html>
+
+</body>
+</html>
