@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>도착 로케이션 스캔</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<h3>도착 로케이션 QR 스캔</h3>
+<div id="reader"></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const from = params.get("from");
+const item = params.get("item");
+const lot = params.get("lot");
+const spec = params.get("spec");
+const qty = params.get("qty");
+
+const qr = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(cams => {
+  qr.start(
+    { facingMode: { exact: "environment" } },
+    { fps: 10, qrbox: 250 },
+    async text => {
+      await qr.stop();
+      const res = await fetch("/api/move", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          from_location: from,
+          to_location: text.trim(),
+          item_code: item,
+          lot, spec, qty
+        })
+      });
+
+      if (!res.ok) {
+        const e = await res.json();
+        alert(e.detail || "이동 실패");
+        location.href = "/m";
+        return;
+      }
+
+      alert("이동 완료");
+      location.href = "/m";
+    }
+  );
+});
+</script>
+</body>
+</html>
