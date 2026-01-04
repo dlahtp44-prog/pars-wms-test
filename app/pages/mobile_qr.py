@@ -1,38 +1,43 @@
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from app.utils.qr_format import parse_qr
 
 router = APIRouter()
 
 @router.post("/m/qr/submit")
-async def qr_submit(
+def qr_submit(
     request: Request,
-    qr: str = Form(...)
+    qr_raw: str = Form(...),
+    warehouse: str = Form("MAIN"),
+    mode: str = Form("inventory"),
 ):
-    data = parse_qr(qr)
+    """
+    QR 스캔 submit 처리
+    - 이동(mode=move)
+    - 재고조회(mode=inventory)
+    """
 
-    qr_type = data.get("type", "").upper()
+    parsed = parse_qr(qr_raw)
 
-    # 로케이션 QR
-    if qr_type in ["LOC", "LOCATION"]:
-        warehouse = data.get("warehouse", "MAIN")
-        location = data.get("location")
+    # 🔥 핵심 수정 포인트
+    location = parsed.get("location")
 
+    if not location:
+        # QR 파싱 실패 시 다시 QR 페이지로
+        return RedirectResponse(
+            url="/m/qr?error=invalid_qr",
+            status_code=302
+        )
+
+    # 이동 모드
+    if mode == "move":
         return RedirectResponse(
             url=f"/m/qr/inventory?warehouse={warehouse}&location={location}",
             status_code=302
         )
 
-    # 품목 QR (확장 대비)
-    if qr_type in ["ITEM", "PRODUCT"]:
-        item_code = data.get("code")
-        lot = data.get("lot")
-        spec = data.get("spec")
-
-        return RedirectResponse(
-            url=f"/m/item?item_code={item_code}&lot={lot}&spec={spec}",
-            status_code=302
-        )
-
-    # 알 수 없는 QR
-    return RedirectResponse("/m/qr", status_code=302)
+    # 기본: 재고 조회
+    return RedirectResponse(
+        url=f"/m/qr/inventory?warehouse={warehouse}&location={location}",
+        status_code=302
+    )
