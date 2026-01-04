@@ -5,7 +5,9 @@ from fastapi.staticfiles import StaticFiles
 from app.core.paths import STATIC_DIR
 from app.db import init_db
 
-# API routers
+# =========================
+# API Routers
+# =========================
 from app.routers import (
     api_inbound,
     api_outbound,
@@ -17,7 +19,9 @@ from app.routers import (
     api_calendar,
 )
 
-# Page routers (PC)
+# =========================
+# PC Page Routers
+# =========================
 from app.pages import (
     index,
     inbound,
@@ -31,7 +35,9 @@ from app.pages import (
     calendar,
 )
 
-# Mobile pages
+# =========================
+# Mobile Page Routers
+# =========================
 from app.pages import (
     mobile_home,
     mobile_qr,
@@ -39,7 +45,19 @@ from app.pages import (
     mobile_inventory_detail,
 )
 
-app = FastAPI(title="PARS WMS", version="1.7.0-calendar")
+# =========================
+# Mobile Action Routers
+# =========================
+from app.routers import mobile_move
+
+
+# =========================
+# App Init
+# =========================
+app = FastAPI(
+    title="PARS WMS",
+    version="1.7.1-calendar-stable",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,13 +67,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static
+# =========================
+# Static Files
+# =========================
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# DB init
+# =========================
+# DB Init
+# =========================
 init_db()
 
-# Include API routers
+# =========================
+# Include API Routers
+# =========================
 app.include_router(api_inbound.router)
 app.include_router(api_outbound.router)
 app.include_router(api_move.router)
@@ -65,7 +89,9 @@ app.include_router(excel_inbound.router)
 app.include_router(excel_outbound.router)
 app.include_router(api_calendar.router)
 
-# Include page routers
+# =========================
+# Include PC Page Routers
+# =========================
 app.include_router(index.router)
 app.include_router(inbound.router)
 app.include_router(outbound.router)
@@ -77,8 +103,11 @@ app.include_router(page_excel_inbound.router)
 app.include_router(page_excel_outbound.router)
 app.include_router(calendar.router)
 
-# Mobile routers
+# =========================
+# Include Mobile Routers
+# =========================
 app.include_router(mobile_home.router)
 app.include_router(mobile_qr.router)
 app.include_router(mobile_qr_inventory.router)
 app.include_router(mobile_inventory_detail.router)
+app.include_router(mobile_move.router)
