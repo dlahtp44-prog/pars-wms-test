@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>캘린더 메모</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <style>
+    .cal-wrap{max-width:1100px;margin:24px auto;padding:0 12px;}
+    .cal-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;}
+    .cal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .cal-top h2{margin:0;font-size:20px;}
+    .cal-actions{display:flex;gap:8px;align-items:center;}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#fff;cursor:pointer;}
+    .btn:hover{background:rgba(255,255,255,0.08);}
+    .layout{display:grid;grid-template-columns: 1.2fr 0.8fr;gap:12px;margin-top:12px;}
+    @media (max-width: 900px){ .layout{grid-template-columns:1fr;} }
+    .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px;}
+    .dow{opacity:0.8;text-align:center;font-size:12px;padding:6px 0;}
+    .day{min-height:70px;border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.02);padding:8px;cursor:pointer;position:relative;}
+    .day:hover{background:rgba(255,255,255,0.06);}
+    .day.muted{opacity:0.35;cursor:default;}
+    .day .num{font-size:13px;opacity:0.9;}
+    .dot{position:absolute;right:10px;top:10px;width:8px;height:8px;border-radius:999px;background:#4ade80;display:none;}
+    .day.has-memo .dot{display:block;}
+    .side{border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);border-radius:16px;padding:12px;}
+    .side h3{margin:0 0 10px 0;font-size:16px;}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+    .field label{font-size:12px;opacity:0.8;}
+    .field input,.field textarea{
+      width:100%;border-radius:12px;border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.25);color:#fff;padding:10px;outline:none;
+    }
+    .field textarea{min-height:160px;resize:vertical;max-width:100%;}
+    .meta{font-size:12px;opacity:0.7;line-height:1.4;}
+    .toast{margin-top:8px;font-size:12px;opacity:0.85;}
+    .back{display:inline-block;margin:12px 0;color:#93c5fd;text-decoration:none;}
+  </style>
+</head>
+<body>
+  <div class="cal-wrap">
+    <a class="back" href="/">← 메인으로</a>
+
+    <div class="cal-card">
+      <div class="cal-top">
+        <h2 id="title">캘린더</h2>
+        <div class="cal-actions">
+          <button class="btn" id="prev">◀</button>
+          <button class="btn" id="today">오늘</button>
+          <button class="btn" id="next">▶</button>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div>
+          <div class="grid" id="dow"></div>
+          <div class="grid" id="grid"></div>
+        </div>
+
+        <div class="side">
+          <h3>메모</h3>
+
+          <div class="field">
+            <label>선택 날짜</label>
+            <input id="date" readonly />
+          </div>
+
+          <div class="field">
+            <label>작업자(선택)</label>
+            <input id="author" placeholder="예: 홍길동 (선택)" />
+          </div>
+
+          <div class="field">
+            <label>메모</label>
+            <textarea id="memo" placeholder="내용 입력 후 저장"></textarea>
+          </div>
+
+          <button class="btn" id="save">저장</button>
+
+          <div class="toast" id="toast"></div>
+          <div class="meta" id="meta"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const DOW = ["일","월","화","수","목","금","토"];
+  const dowEl = document.getElementById("dow");
+  const gridEl = document.getElementById("grid");
+  const titleEl = document.getElementById("title");
+
+  const dateEl = document.getElementById("date");
+  const memoEl = document.getElementById("memo");
+  const authorEl = document.getElementById("author");
+  const metaEl = document.getElementById("meta");
+  const toastEl = document.getElementById("toast");
+
+  let view = new Date();
+  let memos = {}; // {date: {memo, author, updated_at}}
+
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+  function setToast(msg){
+    toastEl.textContent = msg || "";
+    if(msg){
+      setTimeout(()=>{ if(toastEl.textContent===msg) toastEl.textContent=""; }, 1600);
+    }
+  }
+
+  function renderDow(){
+    dowEl.innerHTML = "";
+    DOW.forEach(x=>{
+      const div=document.createElement("div");
+      div.className="dow";
+      div.textContent=x;
+      dowEl.appendChild(div);
+    });
+  }
+
+  async function loadMonth(){
+    const y=view.getFullYear();
+    const m=view.getMonth()+1;
+    titleEl.textContent = `캘린더 메모 (${y}.${pad(m)})`;
+    const res = await fetch(`/api/calendar/month?year=${y}&month=${m}`);
+    memos = await res.json();
+    renderGrid();
+    // default select today if same month else first day
+    const today = new Date();
+    const sel = (today.getFullYear()===y && today.getMonth()===view.getMonth()) ? today : new Date(y, view.getMonth(), 1);
+    selectDate(sel);
+  }
+
+  function renderGrid(){
+    gridEl.innerHTML="";
+    const y=view.getFullYear();
+    const m=view.getMonth();
+    const first = new Date(y, m, 1);
+    const startDay = first.getDay();
+    const start = new Date(y, m, 1 - startDay); // sunday before
+
+    for(let i=0;i<42;i++){
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+      const div=document.createElement("div");
+      div.className="day";
+      if(d.getMonth()!==m){
+        div.classList.add("muted");
+      }
+      const num=document.createElement("div");
+      num.className="num";
+      num.textContent = d.getDate();
+      const dot=document.createElement("div");
+      dot.className="dot";
+      div.appendChild(num);
+      div.appendChild(dot);
+
+      const key = ymd(d);
+      if(memos[key] && (memos[key].memo||"").trim().length>0){
+        div.classList.add("has-memo");
+      }
+
+      if(!div.classList.contains("muted")){
+        div.addEventListener("click", ()=>selectDate(d));
+      }
+
+      gridEl.appendChild(div);
+    }
+  }
+
+  function selectDate(d){
+    const key=ymd(d);
+    dateEl.value = key;
+    memoEl.value = (memos[key]?.memo) || "";
+    authorEl.value = (memos[key]?.author) || "";
+    const up = memos[key]?.updated_at;
+    metaEl.textContent = up ? `마지막 저장: ${up}` : "";
+  }
+
+  async function save(){
+    const date = dateEl.value;
+    if(!date){ return; }
+    const form = new FormData();
+    form.append("date", date);
+    form.append("memo", memoEl.value || "");
+    form.append("author", authorEl.value || "");
+    const res = await fetch("/api/calendar/save", { method:"POST", body: form });
+    if(!res.ok){
+      const t = await res.text();
+      setToast("저장 실패: " + t);
+      return;
+    }
+    setToast("저장 완료");
+    await loadMonth(); // refresh dots + meta
+  }
+
+  document.getElementById("prev").addEventListener("click", async ()=>{
+    view = new Date(view.getFullYear(), view.getMonth()-1, 1);
+    await loadMonth();
+  });
+  document.getElementById("next").addEventListener("click", async ()=>{
+    view = new Date(view.getFullYear(), view.getMonth()+1, 1);
+    await loadMonth();
+  });
+  document.getElementById("today").addEventListener("click", async ()=>{
+    view = new Date();
+    await loadMonth();
+  });
+  document.getElementById("save").addEventListener("click", save);
+
+  renderDow();
+  loadMonth();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>이력</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>이력</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>시간</th><th>구분</th><th>창고</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>FROM</th><th>TO</th><th>수량</th><th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="small">{{r.created_at}}</td>
+          <td><span class="badge">{{r.type}}</span></td>
+          <td>{{r.warehouse}}</td>
+          <td>{{r.item_code}}</td>
+          <td>{{r.item_name}}</td>
+          <td>{{r.lot}}</td>
+          <td>{{r.spec}}</td>
+          <td>{{r.from_location}}</td>
+          <td>{{r.to_location}}</td>
+          <td>{{r.qty}}</td>
+          <td>{{r.note}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="/">← 메인</a></p>
+  </div>
+</div>
+</body></html>
