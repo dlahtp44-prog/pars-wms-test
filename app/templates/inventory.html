@@ -1,64 +1,119 @@
-<!doctype html>
-<html lang="ko"><head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link rel="stylesheet" href="/static/app.css"/>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>재고조회</title>
-</head><body>
-<div class="container">
-  <div class="card">
-    <h2>재고조회</h2>
+  <link rel="stylesheet" href="/static/app.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>재고조회</h2>
 
-    <form method="get" action="/page/inventory" class="grid2">
-      <div>
-        <label>창고</label>
-        <input name="warehouse" value="{{ filters.warehouse }}"/>
-      </div>
-      <div>
-        <label>로케이션</label>
-        <input name="location" value="{{ filters.location }}"/>
-      </div>
-      <div>
-        <label>품번</label>
-        <input name="item_code" value="{{ filters.item_code }}"/>
-      </div>
-      <div>
-        <label>LOT</label>
-        <input name="lot" value="{{ filters.lot }}"/>
-      </div>
-      <div>
-        <label>규격</label>
-        <input name="spec" value="{{ filters.spec }}"/>
-      </div>
-      <div>
-        <label>표시건수(최대 500)</label>
-        <input name="limit" type="number" value="{{ filters.limit }}"/>
-      </div>
-      <div style="grid-column:1/-1; display:flex; gap:10px; flex-wrap:wrap;">
-        <button type="submit">검색</button>
-        <a class="btn" href="/page/inventory/excel?warehouse={{filters.warehouse}}&location={{filters.location}}&item_code={{filters.item_code}}&lot={{filters.lot}}&spec={{filters.spec}}">엑셀 다운로드</a>
-        <a class="btn" href="/page/excel">엑셀 센터</a>
-        <a class="btn" href="/">메인</a>
-      </div>
-    </form>
+      <form class="form" method="get" action="/page/inventory">
+        <div class="grid2">
+          <div class="field">
+            <label>창고</label>
+            <input name="warehouse" value="{{ filters.warehouse }}" placeholder="예: A동"/>
+          </div>
+          <div class="field">
+            <label>로케이션</label>
+            <input name="location" value="{{ filters.location }}" placeholder="예: B01-01-02-A"/>
+          </div>
+        </div>
 
-    <div style="overflow:auto; margin-top:14px;">
-      <table>
-        <thead>
-          <tr>
-            <th>창고</th><th>로케이션</th><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th>수량</th><th>비고</th><th>updated_at</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for r in rows %}
-          <tr>
-            <td>{{r[0]}}</td><td>{{r[1]}}</td><td>{{r[2]}}</td><td>{{r[3]}}</td><td>{{r[4]}}</td><td>{{r[5]}}</td><td style="text-align:right;">{{r[6]}}</td><td>{{r[7]}}</td><td>{{r[8]}}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+        <div class="grid2">
+          <div class="field">
+            <label>품번</label>
+            <input name="item_code" value="{{ filters.item_code }}" placeholder="예: 766109"/>
+          </div>
+          <div class="field">
+            <label>LOT</label>
+            <input name="lot" value="{{ filters.lot }}" placeholder="예: E465"/>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>규격</label>
+            <input name="spec" value="{{ filters.spec }}" placeholder="예: 1200*2400*6"/>
+          </div>
+          <div class="field" style="display:flex; gap:10px; align-items:flex-end;">
+            <button class="btn" type="submit">검색</button>
+
+            <a class="btn ghost" href="/page/inventory/excel?warehouse={{ filters.warehouse|urlencode }}&location={{ filters.location|urlencode }}&item_code={{ filters.item_code|urlencode }}&lot={{ filters.lot|urlencode }}&spec={{ filters.spec|urlencode }}">
+              엑셀 다운로드
+            </a>
+
+            <a class="btn ghost" href="/page/excel">엑셀 센터</a>
+            <a class="btn ghost" href="/">메인</a>
+          </div>
+        </div>
+      </form>
+
+      <div class="hint">기본 표시 200건 (최근 업데이트 순). 필터 입력 후 “검색”을 누르세요.</div>
+
+      <div class="table-wrap">
+        <table class="table" id="invTable">
+          <thead>
+            <tr>
+              <th>id</th>
+              <th>updated_at</th>
+              <th>창고</th>
+              <th>로케이션</th>
+              <th>품번</th>
+              <th>품명</th>
+              <th>LOT</th>
+              <th>규격</th>
+              <th>수량</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
     </div>
-
   </div>
-</div>
-</body></html>
+
+<script>
+(async function(){
+  const qs = new URLSearchParams(window.location.search);
+  const api = new URL("/api/inventory", window.location.origin);
+
+  // 페이지 필터와 API 파라미터를 동일하게 사용
+  ["warehouse","location","item_code","lot","spec"].forEach(k=>{
+    const v = qs.get(k) || "";
+    if (v) api.searchParams.set(k, v);
+  });
+  api.searchParams.set("limit", "200");
+
+  const res = await fetch(api.toString());
+  if(!res.ok){
+    alert("재고조회 API 호출 실패: " + res.status);
+    return;
+  }
+  const data = await res.json();
+  const body = document.getElementById("invBody");
+  body.innerHTML = "";
+
+  for(const r of data){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.id ?? ""}</td>
+      <td>${r.updated_at ?? ""}</td>
+      <td>${r.warehouse ?? ""}</td>
+      <td>${r.location ?? ""}</td>
+      <td>${r.item_code ?? ""}</td>
+      <td>${r.item_name ?? ""}</td>
+      <td>${r.lot ?? ""}</td>
+      <td>${r.spec ?? ""}</td>
+      <td>${r.qty ?? ""}</td>
+      <td>${r.note ?? ""}</td>
+    `;
+    body.appendChild(tr);
+  }
+})();
+</script>
+</body>
+</html>
