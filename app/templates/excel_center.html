@@ -1,44 +1,51 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>엑셀 센터</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/app.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>엑셀 센터 | PARS WMS</title>
 </head>
 <body>
+<div class="container">
+  <div class="card">
+    <h2>📊 엑셀 센터</h2>
+    <div class="small" style="opacity:.85; margin-top:6px;">
+      입고/출고 엑셀 업로드 및 재고/이력 다운로드
+    </div>
+    <hr style="border-color:#2a2f3a; margin:14px 0;"/>
 
-<h2>📊 엑셀 센터</h2>
+    <h3>📥 입고 엑셀 업로드</h3>
+    <form action="/api/excel/inbound" method="post" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="file" name="file" accept=".xlsx" required>
+      <button type="submit">입고 업로드</button>
+    </form>
 
-<hr>
+    <hr style="border-color:#2a2f3a; margin:14px 0;"/>
 
-<h3>📥 입고 엑셀 업로드</h3>
-<form action="/api/excel/inbound" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".xlsx" required>
-    <button type="submit">입고 업로드</button>
-</form>
+    <h3>📤 출고 엑셀 업로드</h3>
+    <form action="/api/excel/outbound" method="post" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="file" name="file" accept=".xlsx" required>
+      <button type="submit">출고 업로드</button>
+    </form>
 
-<hr>
+    <hr style="border-color:#2a2f3a; margin:14px 0;"/>
 
-<h3>📤 출고 엑셀 업로드</h3>
-<form action="/api/excel/outbound" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".xlsx" required>
-    <button type="submit">출고 업로드</button>
-</form>
+    <h3>📦 재고 엑셀 다운로드</h3>
+    <form action="/page/inventory/excel" method="get">
+      <button type="submit">재고 다운로드</button>
+    </form>
 
-<hr>
+    <hr style="border-color:#2a2f3a; margin:14px 0;"/>
 
-<h3>📦 재고 엑셀 다운로드</h3>
-<form action="/page/inventory/excel" method="get">
-    <button type="submit">재고 다운로드</button>
-</form>
+    <h3>🕘 이력 엑셀 다운로드</h3>
+    <form action="/page/history/excel" method="get">
+      <button type="submit">이력 다운로드</button>
+    </form>
 
-<hr>
-
-<h3>🕘 이력 엑셀 다운로드</h3>
-<form action="/page/history/excel" method="get">
-    <button type="submit">이력 다운로드</button>
-</form>
-
+    <hr style="border-color:#2a2f3a; margin:14px 0;"/>
+    <a class="btn" href="/">홈으로</a>
+  </div>
+</div>
 </body>
 </html>

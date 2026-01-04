@@ -60,6 +60,37 @@ def init_db() -> None:
     cur.execute("""CREATE INDEX IF NOT EXISTS idx_history_created
         ON history(created_at)""")
 
+    # users (simple auth)
+    cur.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at TEXT NOT NULL
+    )""")
+
+    # calendar memo (shared memo calendar)
+    cur.execute("""CREATE TABLE IF NOT EXISTS calendar_memo (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        memo_date TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )""")
+    cur.execute("""CREATE INDEX IF NOT EXISTS idx_calendar_date ON calendar_memo(memo_date)""")
+
+    # seed default admin if no user exists
+    cur.execute("SELECT COUNT(*) FROM users")
+    user_cnt = int(cur.fetchone()[0])
+    if user_cnt == 0:
+        from app.auth import hash_password
+        now = datetime.now().isoformat(timespec='seconds')
+        cur.execute(
+            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?,?,?,?)",
+            ("admin", hash_password("admin1234"), "admin", now)
+        )
+
     conn.commit()
     conn.close()
 

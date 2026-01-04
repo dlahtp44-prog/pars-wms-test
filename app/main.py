@@ -1,10 +1,14 @@
 from fastapi import FastAPI
+from starlette.middleware.sessions import SessionMiddleware
+import os
 from fastapi.staticfiles import StaticFiles
 
 from app.core.paths import STATIC_DIR
 from app.db import init_db
 
 # pages (PC)
+from app.pages.login import router as login_router
+from app.pages.calendar import router as calendar_page_router
 from app.pages.index import router as index_router
 from app.pages.inbound import router as inbound_page_router
 from app.pages.outbound import router as outbound_page_router
@@ -23,6 +27,7 @@ from app.pages.mobile_inventory_detail import router as mobile_inventory_detail_
 from app.pages.mobile_move import router as mobile_move_router
 
 # api
+from app.routers.api_calendar import router as api_calendar_router
 from app.routers.api_inbound import router as api_inbound_router
 from app.routers.api_outbound import router as api_outbound_router
 from app.routers.api_move import router as api_move_router
@@ -31,7 +36,16 @@ from app.routers.api_history import router as api_history_router
 from app.routers.excel_inbound import router as api_excel_inbound_router
 from app.routers.excel_outbound import router as api_excel_outbound_router
 
-app = FastAPI(title="PARS WMS", version="1.6.6-qr")
+app = FastAPI(title="PARS WMS", version="1.7.0-calendar")
+
+# sessions (login)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "pars-wms-secret"),
+    same_site="lax",
+    https_only=bool(os.getenv("HTTPS_ONLY", "0") == "1"),
+)
+
 
 @app.on_event("startup")
 def _startup():
@@ -41,6 +55,8 @@ def _startup():
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # include routers (PC pages)
+app.include_router(login_router)
+app.include_router(calendar_page_router)
 app.include_router(index_router)
 app.include_router(inbound_page_router)
 app.include_router(outbound_page_router)
@@ -59,6 +75,7 @@ app.include_router(mobile_inventory_detail_router)
 app.include_router(mobile_move_router)
 
 # include routers (api)
+app.include_router(api_calendar_router)
 app.include_router(api_inbound_router)
 app.include_router(api_outbound_router)
 app.include_router(api_move_router)
