@@ -70,7 +70,7 @@ app.mount(
 templates = Jinja2Templates(
     directory=os.path.join(BASE_DIR, "templates")
 )
-
+app.state.templates = templates
 # =========================
 # Include Routers
 # =========================
