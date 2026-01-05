@@ -20,7 +20,7 @@ def parse_qr(raw: str) -> dict:
         key = key.strip().lower()
         value = value.strip()
 
-        # type은 제거 (location 오염 원인)
+        # type은 제거 (location 오염 방지)
         if key == "type":
             continue
 
