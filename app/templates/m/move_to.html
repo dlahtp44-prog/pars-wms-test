@@ -1,0 +1,18 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>도착 로케이션/수량</title>
+<script src="https://unpkg.com/html5-qrcode"></script></head><body>
+<div class="container"><div class="card"><h2>3) 도착 로케이션 + 수량</h2>
+<div class="box"><p class="small"><b>창고</b>: {{warehouse}}<br/><b>출발</b>: {{from_location}}<br/><b>품번</b>: {{item_code}}<br/><b>품명</b>: {{item_name}}<br/><b>LOT</b>: {{lot}}<br/><b>규격</b>: {{spec}}<br/><b>현재고</b>: {{available_qty}}</p></div>
+<div id="reader" style="width:100%"></div>
+<form method="post" action="/m/move/to/submit">
+<input type="hidden" name="warehouse" value="{{warehouse}}"/><input type="hidden" name="from_location" value="{{from_location}}"/>
+<input type="hidden" name="item_code" value="{{item_code}}"/><input type="hidden" name="item_name" value="{{item_name}}"/>
+<input type="hidden" name="lot" value="{{lot}}"/><input type="hidden" name="spec" value="{{spec}}"/><input type="hidden" name="available_qty" value="{{available_qty}}"/>
+<label>도착 로케이션 QR</label><input id="to_qr" name="to_qr" required/>
+<label>이동 수량</label><input type="number" name="qty" min="1" max="{{available_qty}}" value="1" required/>
+<label>비고</label><input name="note"/>
+<div class="actions"><button type="submit">이동 완료</button><a class="btn secondary" href="/m/move/select?warehouse={{warehouse}}&from_location={{from_location}}">← 품목 다시 선택</a></div>
+</form></div></div>
+<script>
+const qr=new Html5Qrcode("reader"); const out=document.getElementById("to_qr");
+Html5Qrcode.getCameras().then(cams=>{ if(!cams||cams.length===0) return; qr.start(cams[0].id,{fps:10,qrbox:{width:260,height:260}},t=>{out.value=t;},()=>{});}).catch(()=>{});
+</script></body></html>

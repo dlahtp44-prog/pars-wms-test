@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko"><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>입고 엑셀 업로드(한글 컬럼 고정)</title>
+</head><body>
+<div class="container">
+  <div class="card">
+    <h2>입고 엑셀 업로드(한글 컬럼 고정)</h2>
+    <p class="small">필수 컬럼: 로케이션, 품번, 품명, LOT, 규격, 수량</p>
+
+    <form method="post" action="/api/excel/inbound" enctype="multipart/form-data">
+      <label>기본 창고(엑셀에 '창고' 컬럼이 없을 때 사용)</label>
+      <input name="warehouse" value="MAIN"/>
+
+      <label>엑셀 파일(xlsx)</label>
+      <input type="file" name="file" accept=".xlsx,.xlsm" required/>
+
+      <div class="actions">
+        <button type="submit">업로드</button>
+        <a class="btn secondary" href="/page/excel">← 엑셀센터</a>
+      </div>
+    </form>
+  </div>
+</div>
+</body></html>
