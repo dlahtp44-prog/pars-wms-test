@@ -4,20 +4,21 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.paths import TEMPLATES_DIR
 from app.db import query_inventory, upsert_inventory, add_history
-from app.utils.qr_format import detect_qr_type, extract_location, extract_item_fields
+from app.utils.qr_format import detect_qr_type, extract_location, parse_qr
 
 router = APIRouter(prefix="/m/move", tags=["mobile-move"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+# =========================
+# A. 기존 3단계 이동 (안정)
+# =========================
 
 @router.get("", response_class=HTMLResponse)
 def move_home(request: Request):
     return templates.TemplateResponse("m/move_home.html", {"request": request})
 
 
-# -------------------------
-# Step 1) FROM location scan
-# -------------------------
 @router.get("/from", response_class=HTMLResponse)
 def move_from(request: Request, error: str = ""):
     return templates.TemplateResponse("m/move_from.html", {"request": request, "error": error})
@@ -26,19 +27,26 @@ def move_from(request: Request, error: str = ""):
 @router.post("/from/submit")
 def move_from_submit(qrtext: str = Form(...)):
     raw = (qrtext or "").strip()
+
     if detect_qr_type(raw) == "ITEM":
-        return RedirectResponse(url="/m/move/from?error=출발 로케이션 QR을 스캔해 주세요.(품목 QR 아님)", status_code=303)
+        return RedirectResponse(
+            url="/m/move/from?error=출발 로케이션 QR을 스캔하세요.",
+            status_code=303
+        )
 
-    loc = extract_location(raw) or raw
+    loc = extract_location(raw)
     if not loc:
-        return RedirectResponse(url="/m/move/from?error=QR 값이 비어있습니다.", status_code=303)
+        return RedirectResponse(
+            url="/m/move/from?error=로케이션 인식 실패",
+            status_code=303
+        )
 
-    return RedirectResponse(url=f"/m/move/select?from_location={loc}", status_code=303)
+    return RedirectResponse(
+        url=f"/m/move/select?from_location={loc}",
+        status_code=303
+    )
 
 
-# -------------------------
-# Step 2) Select item from inventory at FROM
-# -------------------------
 @router.get("/select", response_class=HTMLResponse)
 def move_select(request: Request, from_location: str):
     rows = query_inventory(location=from_location)
@@ -73,9 +81,6 @@ def move_select_submit(
     )
 
 
-# -------------------------
-# Step 3) TO location scan + qty input
-# -------------------------
 @router.get("/to", response_class=HTMLResponse)
 def move_to(
     request: Request,
@@ -104,9 +109,8 @@ def move_to(
     )
 
 
-@router.post("/to/submit", response_class=HTMLResponse)
+@router.post("/to/submit")
 def move_to_submit(
-    request: Request,
     warehouse: str = Form(...),
     from_location: str = Form(...),
     item_code: str = Form(...),
@@ -119,32 +123,20 @@ def move_to_submit(
     note: str = Form(""),
 ):
     raw = (to_qr or "").strip()
+
     if detect_qr_type(raw) == "ITEM":
-        # 현장 실수 방지
         return RedirectResponse(
-            url=(
-                "/m/move/to"
-                f"?warehouse={warehouse}"
-                f"&from_location={from_location}"
-                f"&item_code={item_code}"
-                f"&item_name={item_name}"
-                f"&lot={lot}"
-                f"&spec={spec}"
-                f"&available_qty={available_qty}"
-                "&error=도착 로케이션 QR을 스캔해 주세요.(품목 QR 아님)"
-            ),
-            status_code=303,
+            url="/m/move/to?error=도착 로케이션 QR을 스캔하세요.",
+            status_code=303
         )
 
-    to_location = extract_location(raw) or raw
+    to_location = extract_location(raw)
     if not to_location:
-        raise HTTPException(status_code=400, detail="도착 로케이션이 비어있습니다.")
-    if qty <= 0:
-        raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
-    if qty > int(available_qty):
-        raise HTTPException(status_code=400, detail="이동 수량이 현재고보다 큽니다.")
+        raise HTTPException(status_code=400, detail="도착 로케이션 인식 실패")
 
-    # 재고 이동(빼기/더하기)
+    if qty <= 0 or qty > available_qty:
+        raise HTTPException(status_code=400, detail="수량 오류")
+
     upsert_inventory(warehouse, from_location, item_code, item_name, lot, spec, -qty, note)
     upsert_inventory(warehouse, to_location, item_code, item_name, lot, spec, qty, note)
     add_history("이동", warehouse, item_code, item_name, lot, spec, from_location, to_location, qty, note)
@@ -152,7 +144,7 @@ def move_to_submit(
     return templates.TemplateResponse(
         "m/move_done.html",
         {
-            "request": request,
+            "request": {},
             "warehouse": warehouse,
             "from_location": from_location,
             "to_location": to_location,
@@ -162,4 +154,33 @@ def move_to_submit(
             "spec": spec,
             "qty": qty,
         },
+    )
+
+
+# =========================
+# B. ITEM QR 즉시 이동 (신규)
+# =========================
+
+@router.get("/item", response_class=HTMLResponse)
+def move_item_qr(
+    request: Request,
+    qr: str,
+    warehouse: str = "MAIN",
+):
+    parsed = parse_qr(qr)
+
+    item_code = parsed.get("item_code")
+    lot = parsed.get("lot")
+
+    if not item_code or not lot:
+        raise HTTPException(status_code=400, detail="ITEM QR 인식 실패")
+
+    return templates.TemplateResponse(
+        "m/move_item.html",
+        {
+            "request": request,
+            "warehouse": warehouse,
+            "item_code": item_code,
+            "lot": lot,
+        }
     )
