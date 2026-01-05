@@ -1,0 +1,38 @@
+PARS WMS - QR Payload Standard v1 (2026-01-04)
+
+1) 목적
+- 로케이션 QR / 품목 QR를 '한 번에 구분'하고, 스캔 결과를 서버가 자동 분기하도록 표준화합니다.
+- 기존(레거시) 줄바꿈 포맷도 병행 지원합니다.
+
+2) 권장 QR 문자열(1줄)
+(1) 로케이션 QR
+  PARS|TYPE=LOCATION|CODE=D01-01
+
+(2) 품목 QR
+  PARS|TYPE=ITEM|CODE=728752|NAME=Walks/1.0 Gray SOFT|LOT=H48N5|SPEC=600*600*9
+
+3) 규칙
+- 시작 토큰: 'PARS' (권장, 없어도 파싱 가능)
+- 구분자: '|' 권장
+  - 허용: '|' 또는 '&' 또는 줄바꿈(레거시)
+- KEY=VALUE 쌍으로 구성
+- TYPE 값: LOCATION / ITEM
+- 필수 필드
+  - LOCATION: CODE
+  - ITEM: CODE, LOT, SPEC (NAME은 권장)
+- 금지/주의
+  - VALUE에 '|'가 들어가면 파싱이 깨질 수 있으므로 '/'로 치환 권장
+
+4) 레거시(기존) 품목 QR(줄바꿈) - 계속 지원
+  품번=728752
+  품명=Walks/1.0 Gray SOFT
+  LOT=H48N5
+  규격=600*600*9
+
+5) 서버 동작(모바일 /m/qr)
+- TYPE=ITEM 또는 레거시 품목 포맷 → /m/inventory/detail?item_code=...&lot=...&spec=...
+- TYPE=LOCATION 또는 단순 로케이션 문자열 → /m/qr/inventory?location=...
+
+6) 권장 운영 팁
+- 로케이션 QR은 짧게(예: D01-01, B01-01-02-A)
+- 품목 QR은 'CODE/LOT/SPEC'만으로도 고유 식별되도록 관리(품명은 변경 가능성 대비)
