@@ -9,6 +9,7 @@ def parse_qr(raw: str) -> dict:
     if not raw:
         return result
 
+    raw = raw.strip()
     parts = raw.split("&")
 
     for part in parts:
@@ -16,11 +17,13 @@ def parse_qr(raw: str) -> dict:
             continue
 
         key, value = part.split("=", 1)
+        key = key.strip().lower()
+        value = value.strip()
 
-        # ❌ type은 버린다
-        if key.lower() == "type":
+        # type은 제거 (location 오염 원인)
+        if key == "type":
             continue
 
-        result[key.lower()] = value
+        result[key] = value
 
     return result
