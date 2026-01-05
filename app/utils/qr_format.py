@@ -1,45 +1,30 @@
-from typing import Dict, Tuple
+import re
 
-# 품목 QR 표준 키(최소 필드)
-QR_KEYS_MIN = ["품번","LOT","규격"]
-
-def build_item_qr(item_code: str, item_name: str, lot: str, spec: str, brand: str = "") -> str:
-    """표준 포맷: key=value (줄바꿈 구분)
-    기본: 품번/품명/LOT/규격
-    추가: 브랜드(있으면 포함)
-    """
-    lines=[]
-    if brand:
-        lines.append(f"브랜드={brand}")
-    lines += [
-        f"품번={item_code}",
-        f"품명={item_name}",
-        f"LOT={lot}",
-        f"규격={spec}",
-    ]
-    return "\n".join(lines)
-
-def parse_qr(text: str) -> Dict[str, str]:
-    text = (text or "").strip()
-    data: Dict[str,str] = {}
-    if not text:
-        return data
-    for line in text.splitlines():
-        line=line.strip()
-        if not line:
-            continue
-        if "=" in line:
-            k,v = line.split("=",1)
-            k=k.strip()
-            v=v.strip()
-            if k:
-                data[k]=v
-    return data
 
 def is_item_qr(text: str) -> bool:
-    d=parse_qr(text)
-    return all(k in d and d[k] for k in QR_KEYS_MIN)
+    return "품번" in text and "LOT" in text
 
-def extract_item_fields(text: str) -> Tuple[str,str,str,str,str]:
-    d=parse_qr(text)
-    return d.get("브랜드",""), d.get("품번",""), d.get("품명",""), d.get("LOT",""), d.get("규격","")
+
+def extract_item_fields(text: str):
+    def pick(label):
+        m = re.search(rf"{label}\s*:\s*([^\n/]+)", text)
+        return m.group(1).strip() if m else ""
+
+    return (
+        pick("품번"),
+        pick("품명"),
+        pick("LOT"),
+        pick("규격"),
+    )
+
+
+# ✅ 핵심 함수
+def extract_location_only(text: str) -> str:
+    """
+    type=LOC&warehouse=MAIN&location=D01-01
+    → D01-01
+    """
+    if "location=" in text:
+        return text.split("location=")[-1].strip()
+
+    return text.strip()
