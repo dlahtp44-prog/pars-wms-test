@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>이력 엑셀 다운로드</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>이력 엑셀 다운로드</h2>
+    <form method="get" action="/page/history/excel">
+      <div class="grid2">
+        <div><label>년</label><input name="year" placeholder="예: 2026"/></div>
+        <div><label>월</label><input name="month" placeholder="예: 1"/></div>
+        <div><label>일</label><input name="day" placeholder="예: 2"/></div>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">다운로드</button>
+        <a class="btn secondary" href="/page/excel">센터</a>
+      </div>
+    </form>
+    <p class="small">※ 비우면 전체 이력 다운로드</p>
+  </div>
+</div>
+</body>
+</html>

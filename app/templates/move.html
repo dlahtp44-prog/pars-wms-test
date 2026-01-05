@@ -1,14 +1,79 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>이동</title></head><body>
-<div class="container"><div class="card"><h2>이동</h2><form method="post" action="/api/move">
-<label>창고</label><input name="warehouse" value="MAIN" required/>
-<label>출발 로케이션</label><input name="from_location" required/>
-<label>도착 로케이션</label><input name="to_location" required/>
-<label>품번</label><input name="item_code" required/>
-<label>품명(선택)</label><input name="item_name"/>
-<label>LOT</label><input name="lot" required/>
-<label>규격</label><input name="spec" required/>
-<label>수량</label><input type="number" name="qty" min="1" value="1" required/>
-<label>비고</label><input name="note"/>
-<label>작업자</label><input name="operator"/>
-<div class="actions"><button type="submit">이동 실행</button><a class="btn secondary" href="/">메인</a></div>
-</form></div></div></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>이동</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>이동</h2>
+    <form method="post" action="/api/move">
+      <div class="grid2">
+            <div>
+              <label>창고</label>
+              <input name="warehouse" placeholder="예: MAIN" />
+            </div>
+
+            <div>
+              <label>출발 로케이션</label>
+              <input name="from_location" placeholder="예: D01-01" />
+            </div>
+
+            <div>
+              <label>도착 로케이션</label>
+              <input name="to_location" placeholder="예: D01-02" />
+            </div>
+
+            <div>
+              <label>브랜드</label>
+              <input name="brand" placeholder="" />
+            </div>
+
+            <div>
+              <label>품번</label>
+              <input name="item_code" placeholder="" />
+            </div>
+
+            <div>
+              <label>품명</label>
+              <input name="item_name" placeholder="" />
+            </div>
+
+            <div>
+              <label>LOT</label>
+              <input name="lot" placeholder="" />
+            </div>
+
+            <div>
+              <label>규격</label>
+              <input name="spec" placeholder="" />
+            </div>
+
+            <div>
+              <label>수량</label>
+              <input type="number" name="qty" placeholder="" />
+            </div>
+
+            <div>
+              <label>비고</label>
+              <input name="note" placeholder="" />
+            </div>
+
+            <div>
+              <label>작업자</label>
+              <input name="operator" placeholder="" />
+            </div>
+            </div>
+      <div class="actions">
+        <button class="btn" type="submit">저장</button>
+        <a class="btn secondary" href="/">메인</a>
+      </div>
+    </form>
+    <div id="msg" class="small"></div>
+  </div>
+</div>
+</body>
+</html>

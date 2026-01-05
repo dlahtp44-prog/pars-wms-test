@@ -1,19 +1,44 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>달력 메모</title></head><body>
-<div class="container"><div class="card"><h2>달력 (메모)</h2><p class="small">날짜 선택 후 메모 저장/수정/삭제</p>
-<form method="get" action="/page/calendar" class="actions">
-<input style="max-width:220px" type="date" name="date" value="{{date}}"/><button type="submit">불러오기</button><a class="btn secondary" href="/">메인</a>
-</form>
-{% if date %}
-<div class="box">
-<p class="small"><b>선택 날짜:</b> {{date}}</p>
-<form method="post" action="/api/calendar/save">
-<input type="hidden" name="memo_date" value="{{date}}"/>
-<label>메모</label><input name="memo" value="{{memo}}" placeholder="메모를 입력" required/>
-<div class="actions"><button type="submit">저장/수정</button></div>
-</form>
-<form method="post" action="/api/calendar/delete" style="margin-top:10px;">
-<input type="hidden" name="memo_date" value="{{date}}"/><button type="submit">삭제</button>
-</form>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>달력 메모</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>달력(메모)</h2>
+
+    <form method="get" action="/page/calendar">
+      <label>날짜 선택</label>
+      <input type="date" name="date" value="{{date}}"/>
+      <div class="actions">
+        <button class="btn" type="submit">불러오기</button>
+        <a class="btn secondary" href="/">메인</a>
+      </div>
+    </form>
+
+    <div class="box">
+      <p class="small">마지막 수정: {{updated_at}}</p>
+      <form method="post" action="/api/calendar/save">
+        <input type="hidden" name="date" value="{{date}}"/>
+        <label>메모</label>
+        <input name="memo" value="{{memo}}" placeholder="예: 1/10 재고실사, 부산신항 적출..." />
+        <div class="actions">
+          <button class="btn" type="submit">저장/수정</button>
+        </div>
+      </form>
+
+      <form method="post" action="/api/calendar/delete" onsubmit="return confirm('삭제할까요?');" style="margin-top:10px;">
+        <input type="hidden" name="date" value="{{date}}"/>
+        <button class="btn" type="submit" style="border-color: var(--danger);">삭제</button>
+      </form>
+    </div>
+
+    <p class="small">※ 단순 메모 기능(저장/수정/삭제)</p>
+  </div>
 </div>
-{% else %}<p class="small">위에서 날짜를 선택하세요.</p>{% endif %}
-</div></div></body></html>
+</body>
+</html>

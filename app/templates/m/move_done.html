@@ -1,7 +1,26 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>이동 완료</title></head><body>
-<div class="container"><div class="card"><h2><span class="ok">✅</span> 이동 완료</h2>
-<p class="small"><b>{{warehouse}}</b><br/>{{from_location}} → {{to_location}}</p>
-<p class="small">{{item_code}} / {{item_name}}</p>
-<p class="small">LOT: {{lot}} / SPEC: {{spec}} / QTY: <b>{{qty}}</b></p>
-<div class="grid"><a class="tile" href="/m/qr?mode=move">다음 이동</a><a class="tile" href="/m">모바일 홈</a><a class="tile" href="/page/history">이력(PC)</a></div>
-</div></div></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <title>이동 완료</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>✅ 이동 완료</h2>
+    <p class="small"><b>{{warehouse}}</b></p>
+    <div class="box">
+      <p>출발: <b>{{from_location}}</b> → 도착: <b>{{to_location}}</b></p>
+      <p>{{item_code}} / {{item_name}}</p>
+      <p class="small">LOT: {{lot}} / SPEC: {{spec}} / QTY: <b>{{qty}}</b></p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/m/qr?mode=move">다음 이동</a>
+      <a class="btn secondary" href="/m">모바일 홈</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

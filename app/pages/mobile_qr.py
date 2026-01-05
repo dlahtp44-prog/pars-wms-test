@@ -1,19 +1,27 @@
-from fastapi import APIRouter, Request, Form, Query
+from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from app.utils.qr_format import parse_qr
-templates=Jinja2Templates(directory=str(TEMPLATES_DIR))
-router=APIRouter(prefix="/m/qr", tags=["mobile"])
+from ..core.paths import TEMPLATES_DIR
+from ..utils.qr_format import parse_qr
+
+router = APIRouter(prefix="/m/qr", tags=["mobile"])
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
 @router.get("", response_class=HTMLResponse)
-def qr_home(request:Request, mode:str=Query("inventory")):
-    return templates.TemplateResponse("m/qr_scan.html",{"request":request,"mode":mode})
+def qr_home(request: Request, mode: str = "inventory"):
+    return templates.TemplateResponse("m/qr_scan.html", {"request": request, "mode": mode})
+
 @router.post("/submit")
-def submit(mode:str=Form("inventory"), qr_text:str=Form("")):
-    data=parse_qr(qr_text)
-    wh=data.get("warehouse","MAIN")
-    loc=data.get("location","") or data.get("code","")
-    if mode=="move":
-        if not loc: return RedirectResponse("/m/qr?mode=move",302)
-        return RedirectResponse(f"/m/move/select?warehouse={wh}&from_location={loc}",302)
-    if not loc: return RedirectResponse("/m/qr?mode=inventory",302)
-    return RedirectResponse(f"/m/qr/inventory?warehouse={wh}&location={loc}",302)
+def qr_submit(mode: str = Form("inventory"), raw: str = Form(...)):
+    data = parse_qr(raw)
+    warehouse = data.get("warehouse","MAIN")
+    location = data.get("location","")
+    if not location:
+        return RedirectResponse(url="/m/qr?mode="+mode, status_code=302)
+    if mode == "move":
+        return RedirectResponse(url=f"/m/move/from?warehouse={warehouse}&from_location={location}", status_code=302)
+    return RedirectResponse(url=f"/m/qr/inventory?warehouse={warehouse}&location={location}", status_code=302)
+
+@router.get("/inventory", response_class=HTMLResponse)
+def qr_inventory(request: Request, warehouse: str, location: str):
+    return templates.TemplateResponse("m/qr_inventory.html", {"request": request, "warehouse": warehouse, "location": location})

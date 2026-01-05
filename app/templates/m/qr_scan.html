@@ -1,12 +1,71 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>QR 스캔</title>
-<script src="https://unpkg.com/html5-qrcode"></script></head><body>
-<div class="container"><div class="card"><h2>QR 스캔</h2><p class="small">모드: <b>{{mode}}</b></p><div id="reader" style="width:100%"></div>
-<form method="post" action="/m/qr/submit" style="margin-top:12px;">
-<input type="hidden" name="mode" value="{{mode}}"/>
-<label>QR 내용(스캔되면 자동 입력)</label><input id="qr_text" name="qr_text" required/>
-<div class="actions"><button type="submit">확인</button><a class="btn secondary" href="/m">모바일 홈</a></div>
-</form></div></div>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <title>QR 스캔</title>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>QR 스캔 ({{mode}})</h2>
+
+    <div class="box">
+      <div id="reader" style="width:100%;"></div>
+      <p class="small">카메라가 안되면 아래 수동 입력 사용</p>
+    </div>
+
+    <form method="post" action="/m/qr/submit">
+      <input type="hidden" name="mode" value="{{mode}}"/>
+      <label>QR 문자열(수동)</label>
+      <input name="raw" placeholder="예: type=LOC&warehouse=MAIN&location=D01-01 또는 D01-01" />
+      <div class="actions">
+        <button class="btn" type="submit">확인</button>
+        <a class="btn secondary" href="/m">모바일 홈</a>
+      </div>
+    </form>
+
+    <div id="scanMsg" class="small" style="margin-top:10px;"></div>
+  </div>
+</div>
+
 <script>
-const qr=new Html5Qrcode("reader"); const out=document.getElementById("qr_text");
-Html5Qrcode.getCameras().then(cams=>{ if(!cams||cams.length===0) return; qr.start(cams[0].id,{fps:10,qrbox:{width:260,height:260}},t=>{out.value=t;},()=>{});}).catch(()=>{});
-</script></body></html>
+const mode = "{{mode}}";
+const msg = document.getElementById("scanMsg");
+function onScanSuccess(decodedText) {
+  msg.textContent = "스캔됨: " + decodedText;
+  // 폼 자동 제출
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = "/m/qr/submit";
+  const m = document.createElement("input"); m.type="hidden"; m.name="mode"; m.value=mode;
+  const r = document.createElement("input"); r.type="hidden"; r.name="raw"; r.value=decodedText;
+  form.appendChild(m); form.appendChild(r);
+  document.body.appendChild(form);
+  form.submit();
+}
+function onScanFailure(error) {
+  // ignore
+}
+try{
+  const html5QrCode = new Html5Qrcode("reader");
+  Html5Qrcode.getCameras().then(cameras => {
+    if (cameras && cameras.length) {
+      html5QrCode.start(
+        cameras[0].id,
+        { fps: 10, qrbox: 250 },
+        onScanSuccess,
+        onScanFailure
+      );
+    } else {
+      msg.textContent = "카메라를 찾을 수 없습니다.";
+    }
+  }).catch(err => { msg.textContent = "카메라 권한/지원 문제: " + err; });
+}catch(e){
+  msg.textContent = "QR 라이브러리 로딩 실패: " + e;
+}
+</script>
+</body>
+</html>
