@@ -41,35 +41,69 @@
   </div>
 </div>
 
+
 <script>
-const msg = document.getElementById("scanMsg");
-const input = document.getElementById("to_location");
+let qr = null;
+let currentCameraId = null;
 
-function onScanSuccess(decodedText){
-  msg.textContent = "스캔됨: " + decodedText;
-  // decodedText가 querystring이면 location만 추출 (간단히)
-  let loc = decodedText;
-  if(decodedText.includes("location=")){
-    try{
-      const p = new URLSearchParams(decodedText);
-      if(p.get("location")) loc = p.get("location");
-    }catch(e){}
-  }
-  input.value = loc;
+async function initCameras() {
+  const cams = await Html5Qrcode.getCameras();
+  const sel = document.getElementById("cameraSelect");
+  if (!cams || cams.length === 0) return;
+
+  sel.innerHTML = "";
+  cams.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.label || ("camera-" + c.id);
+    sel.appendChild(opt);
+  });
+
+  const back = cams.find(c => (c.label || "").toLowerCase().includes("back") || (c.label || "").toLowerCase().includes("rear") || (c.label || "").toLowerCase().includes("environment"));
+  const front = cams.find(c => (c.label || "").toLowerCase().includes("front") || (c.label || "").toLowerCase().includes("user"));
+  const preferred = back || front || cams[0];
+  sel.value = preferred.id;
+
+  await startWithCamera(sel.value);
+
+  sel.addEventListener("change", async () => {
+    await startWithCamera(sel.value);
+  });
+
+  document.getElementById("toggleBtn").addEventListener("click", async () => {
+    const options = Array.from(sel.options).map(o => o.value);
+    if (options.length < 2) return;
+    const idx = options.indexOf(sel.value);
+    const next = options[(idx + 1) % options.length];
+    sel.value = next;
+    await startWithCamera(next);
+  });
 }
 
-try{
-  const html5QrCode = new Html5Qrcode("reader");
-  Html5Qrcode.getCameras().then(cameras => {
-    if (cameras && cameras.length) {
-      html5QrCode.start(cameras[0].id, { fps: 10, qrbox: 250 }, onScanSuccess, ()=>{});
-    } else {
-      msg.textContent="카메라 없음";
+async function startWithCamera(cameraId){
+  const toqr = document.getElementById("to_qr");
+  try{
+    if (!qr) qr = new Html5Qrcode("reader");
+    if (currentCameraId) {
+      try { await qr.stop(); } catch(e) {}
+      try { await qr.clear(); } catch(e) {}
+      qr = new Html5Qrcode("reader");
     }
-  }).catch(err => { msg.textContent="권한/지원 문제: "+err; });
-}catch(e){
-  msg.textContent="QR 라이브러리 로딩 실패: "+e;
+    currentCameraId = cameraId;
+
+    await qr.start(
+      cameraId,
+      { fps: 10, qrbox: { width: 260, height: 260 } },
+      (decodedText) => { toqr.value = decodedText; },
+      () => {}
+    );
+  }catch(e){
+    // 무시
+  }
 }
+
+initCameras().catch(()=>{});
 </script>
+
 </body>
 </html>

@@ -31,41 +31,73 @@
   </div>
 </div>
 
+
 <script>
-const mode = "{{mode}}";
-const msg = document.getElementById("scanMsg");
-function onScanSuccess(decodedText) {
-  msg.textContent = "스캔됨: " + decodedText;
-  // 폼 자동 제출
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = "/m/qr/submit";
-  const m = document.createElement("input"); m.type="hidden"; m.name="mode"; m.value=mode;
-  const r = document.createElement("input"); r.type="hidden"; r.name="raw"; r.value=decodedText;
-  form.appendChild(m); form.appendChild(r);
-  document.body.appendChild(form);
-  form.submit();
+let qr = null;
+let currentCameraId = null;
+
+async function initCameras() {
+  const cams = await Html5Qrcode.getCameras();
+  const sel = document.getElementById("cameraSelect");
+  if (!cams || cams.length === 0) return;
+
+  // 옵션 채우기
+  sel.innerHTML = "";
+  cams.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.label || ("camera-" + c.id);
+    sel.appendChild(opt);
+  });
+
+  // 기본: 후면(environment) 우선
+  const back = cams.find(c => (c.label || "").toLowerCase().includes("back") || (c.label || "").toLowerCase().includes("rear") || (c.label || "").toLowerCase().includes("environment"));
+  const front = cams.find(c => (c.label || "").toLowerCase().includes("front") || (c.label || "").toLowerCase().includes("user"));
+  const preferred = back || front || cams[0];
+  sel.value = preferred.id;
+
+  await startWithCamera(sel.value);
+
+  sel.addEventListener("change", async () => {
+    await startWithCamera(sel.value);
+  });
+
+  // 토글 버튼(가능하면)
+  document.getElementById("toggleBtn").addEventListener("click", async () => {
+    const options = Array.from(sel.options).map(o => o.value);
+    if (options.length < 2) return;
+    const idx = options.indexOf(sel.value);
+    const next = options[(idx + 1) % options.length];
+    sel.value = next;
+    await startWithCamera(next);
+  });
 }
-function onScanFailure(error) {
-  // ignore
-}
-try{
-  const html5QrCode = new Html5Qrcode("reader");
-  Html5Qrcode.getCameras().then(cameras => {
-    if (cameras && cameras.length) {
-      html5QrCode.start(
-        cameras[0].id,
-        { fps: 10, qrbox: 250 },
-        onScanSuccess,
-        onScanFailure
-      );
-    } else {
-      msg.textContent = "카메라를 찾을 수 없습니다.";
+
+async function startWithCamera(cameraId){
+  try{
+    if (!qr) qr = new Html5Qrcode("reader");
+    if (currentCameraId) {
+      try { await qr.stop(); } catch(e) {}
+      try { await qr.clear(); } catch(e) {}
+      qr = new Html5Qrcode("reader");
     }
-  }).catch(err => { msg.textContent = "카메라 권한/지원 문제: " + err; });
-}catch(e){
-  msg.textContent = "QR 라이브러리 로딩 실패: " + e;
+    currentCameraId = cameraId;
+
+    await qr.start(
+      cameraId,
+      { fps: 10, qrbox: { width: 260, height: 260 } },
+      (decodedText) => {
+        document.getElementById("qrtext").value = decodedText;
+      },
+      () => {}
+    );
+  }catch(e){
+    // 무시
+  }
 }
+
+initCameras().catch(()=>{});
 </script>
+
 </body>
 </html>

@@ -4,40 +4,80 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="stylesheet" href="/static/app.css"/>
-  <title>달력 메모</title>
+  <title>달력(메모)</title>
+  <style>
+    .cal-head{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;}
+    .cal-nav{display:flex; gap:8px; align-items:center;}
+    .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:10px;}
+    .cal-dow{padding:8px; text-align:center; font-weight:700; opacity:.9; border:1px solid rgba(255,255,255,.08); border-radius:10px;}
+    .cal-cell{border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:8px; height:92px; overflow:hidden; cursor:pointer; background:rgba(255,255,255,.02);}
+    .cal-cell:hover{border-color:rgba(255,255,255,.18);}
+    .cal-cell.out{opacity:.35;}
+    .cal-day{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+    .cal-memo{font-size:12px; line-height:1.25; opacity:.9; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-wrap;}
+    .cal-picked{outline:2px solid rgba(120, 140, 255, .55);}
+    @media (max-width: 720px){
+      .cal-cell{height:78px; padding:7px;}
+      .cal-memo{-webkit-line-clamp:2;}
+    }
+  </style>
 </head>
 <body>
 <div class="container">
   <div class="card">
-    <h2>달력(메모)</h2>
-
-    <form method="get" action="/page/calendar">
-      <label>날짜 선택</label>
-      <input type="date" name="date" value="{{date}}"/>
-      <div class="actions">
-        <button class="btn" type="submit">불러오기</button>
+    <div class="cal-head">
+      <h2 style="margin:0;">달력(메모)</h2>
+      <div class="cal-nav">
+        <a class="btn secondary" href="/page/calendar?month={{prev_month}}">◀</a>
+        <form method="get" action="/page/calendar" style="display:flex; gap:8px; align-items:center;">
+          <input type="month" name="month" value="{{month}}" style="min-width:160px;"/>
+          <button class="btn" type="submit">이동</button>
+        </form>
+        <a class="btn secondary" href="/page/calendar?month={{next_month}}">▶</a>
         <a class="btn secondary" href="/">메인</a>
       </div>
-    </form>
+    </div>
 
+    <div class="cal-grid" style="margin-top:12px;">
+      <div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div>
+      <div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div><div class="cal-dow">일</div>
+
+      {% for week in weeks %}
+        {% for d in week %}
+          <div class="cal-cell {% if not d.in_month %}out{% endif %} {% if d.date == pick %}cal-picked{% endif %}"
+               onclick="location.href='/page/calendar?month={{month}}&pick={{d.date}}'">
+            <div class="cal-day">
+              <div><b>{{d.day}}</b></div>
+              <div style="font-size:11px; opacity:.75;">{% if d.date == pick %}선택{% endif %}</div>
+            </div>
+            <div class="cal-memo">{{d.memo}}</div>
+          </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+
+    <hr style="margin:16px 0; opacity:.25;"/>
+
+    <h3 style="margin:0 0 10px 0;">선택일 메모: {{pick}}</h3>
     <div class="box">
       <p class="small">마지막 수정: {{updated_at}}</p>
+
       <form method="post" action="/api/calendar/save">
-        <input type="hidden" name="date" value="{{date}}"/>
+        <input type="hidden" name="date" value="{{pick}}"/>
         <label>메모</label>
-        <input name="memo" value="{{memo}}" placeholder="예: 1/10 재고실사, 부산신항 적출..." />
+        <input name="memo" value="{{memo}}" placeholder="예: 1/10 재고실사, 부산신항 적출..."/>
         <div class="actions">
           <button class="btn" type="submit">저장/수정</button>
         </div>
       </form>
 
       <form method="post" action="/api/calendar/delete" onsubmit="return confirm('삭제할까요?');" style="margin-top:10px;">
-        <input type="hidden" name="date" value="{{date}}"/>
+        <input type="hidden" name="date" value="{{pick}}"/>
         <button class="btn" type="submit" style="border-color: var(--danger);">삭제</button>
       </form>
     </div>
 
-    <p class="small">※ 단순 메모 기능(저장/수정/삭제)</p>
+    <p class="small">※ 월 달력에서 메모를 한눈에 보고, 날짜 클릭 후 저장/수정/삭제합니다.</p>
   </div>
 </div>
 </body>
