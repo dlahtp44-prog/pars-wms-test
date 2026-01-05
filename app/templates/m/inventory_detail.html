@@ -1,7 +1,0 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/static/app.css"/><title>재고 상세</title></head><body>
-<div class="container"><div class="card"><h2>재고 상세</h2><p class="small"><b>창고</b>: {{warehouse}} / <b>로케이션</b>: {{location}}</p>
-<div style="overflow:auto;margin-top:10px;"><table><thead><tr><th>품번</th><th>품명</th><th>LOT</th><th>규격</th><th style="text-align:right;">수량</th></tr></thead><tbody>
-{% for r in rows %}<tr><td>{{r.item_code}}</td><td>{{r.item_name}}</td><td>{{r.lot}}</td><td>{{r.spec}}</td><td style="text-align:right;">{{r.qty}}</td></tr>{% endfor %}
-</tbody></table></div>
-<div class="actions"><a class="btn" href="/m/qr?mode=inventory">다시 스캔</a><a class="btn secondary" href="/m">모바일 홈</a></div>
-</div></div></body></html>
