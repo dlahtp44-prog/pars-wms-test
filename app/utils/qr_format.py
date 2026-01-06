@@ -1,3 +1,5 @@
+# app/utils/qr_format.py
+
 import re
 
 # =========================
@@ -38,20 +40,32 @@ def extract_location_only(text: str) -> str:
 
 
 # =========================
-# ✅ 품목 QR 생성 (모바일 상세용)
+# ✅ 품목 QR 생성 (v1.8 기준 단일 포맷)
 # =========================
 def build_item_qr(
     item_code: str,
     item_name: str,
     lot: str,
     spec: str,
+    brand: str | None = None,
 ) -> str:
     """
-    모바일 / 라벨 / 상세 페이지 공용 QR 포맷
+    QR 포함 필드:
+    - 품번
+    - 품명
+    - LOT
+    - 규격
+    - 브랜드(선택)
     """
-    return (
+
+    qr = (
         f"품번:{item_code}/"
         f"품명:{item_name}/"
         f"LOT:{lot}/"
         f"규격:{spec}"
     )
+
+    if brand:
+        qr += f"/브랜드:{brand}"
+
+    return qr
