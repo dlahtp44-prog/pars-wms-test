@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>로케이션 재고</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-<h3>로케이션: {{ location }}</h3>
+
+<h3>📦 로케이션: {{ location }}</h3>
 
 {% if items %}
-<table border="1">
+<table border="1" width="100%">
     <tr>
         <th>브랜드</th>
         <th>품번</th>
@@ -24,12 +26,16 @@
         <td>{{ r.item_name }}</td>
         <td>{{ r.lot }}</td>
         <td>{{ r.spec }}</td>
-        <td>{{ r.qty }}</td>
+        <td><b>{{ r.qty }}</b></td>
     </tr>
     {% endfor %}
 </table>
 {% else %}
 <p>재고가 없습니다.</p>
 {% endif %}
+
+<br>
+<a href="/m">← 모바일 홈</a>
+
 </body>
 </html>
