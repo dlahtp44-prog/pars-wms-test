@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from datetime import date
 
 from app.core.paths import TEMPLATES_DIR
 from app.db import list_damage_codes
@@ -20,6 +21,11 @@ def damage_page(
     lot: str = "",
     spec: str = "",
 ):
+    # -----------------------------
+    # 오늘 날짜 (발생일 기본값)
+    # -----------------------------
+    request.state.today = date.today().isoformat()
+
     # -----------------------------
     # 파손 분류 코드 조회
     # -----------------------------
