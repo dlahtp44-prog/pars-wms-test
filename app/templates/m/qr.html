@@ -7,19 +7,18 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-<h3>QR 스캔 (재고 조회)</h3>
-
+<h3>QR 스캔 (로케이션)</h3>
 <div id="reader" style="width:100%"></div>
 
 <script>
-const qr = new Html5Qrcode("reader");
+const html5QrCode = new Html5Qrcode("reader");
 
-qr.start(
+html5QrCode.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
-    (text) => {
-        qr.stop();
-        location.href = `/m/qr/inventory?qrtext=${encodeURIComponent(text)}`;
+    qrText => {
+        window.location.href =
+            "/m/qr/inventory?qrtext=" + encodeURIComponent(qrText);
     }
 );
 </script>
