@@ -11,7 +11,6 @@ from app.core.paths import DB_PATH
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-    # SQLite FK 보호 (논리적 무결성)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
@@ -90,14 +89,13 @@ def init_db() -> None:
     cur.execute("""
         CREATE TABLE IF NOT EXISTS damage_codes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,          -- 물류 / 사옥 / 운송 / 하차지 / 가공공정 / 원자재 / 부상
-            type TEXT NOT NULL,              -- 수작업 / 지게차 / 업체명 등
-            situation TEXT NOT NULL,         -- 이동 / 낙하 / 충격 / 재단불량 등
+            category TEXT NOT NULL,
+            type TEXT NOT NULL,
+            situation TEXT NOT NULL,
             description TEXT DEFAULT '',
             is_active INTEGER NOT NULL DEFAULT 1
         )
     """)
-
     cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS ux_damage_codes_key
         ON damage_codes (category, type, situation)
@@ -105,14 +103,12 @@ def init_db() -> None:
 
     # -------------------------------------------------
     # DAMAGE HISTORY (CS / 파손 이력)
-    # NOTE:
-    # - 재고 수량을 자동 차감하지 않는다.
-    # - 물류 행위(history)와 품질/CS 기록은 의도적으로 분리
+    # NOTE: 재고 수량 자동 차감하지 않음 (의도적으로 분리)
     # -------------------------------------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS damage_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            occurred_at TEXT NOT NULL,       -- 발생일
+            occurred_at TEXT NOT NULL,       -- 발생일 (YYYY-MM-DD)
             warehouse TEXT NOT NULL,
             location TEXT NOT NULL,
             brand TEXT NOT NULL DEFAULT '',
@@ -121,7 +117,7 @@ def init_db() -> None:
             lot TEXT NOT NULL,
             spec TEXT NOT NULL,
             qty INTEGER NOT NULL,
-            damage_code_id INTEGER NOT NULL, -- damage_codes.id
+            damage_code_id INTEGER NOT NULL,
             detail TEXT DEFAULT '',
             created_at TEXT NOT NULL
         )
@@ -137,12 +133,11 @@ def init_db() -> None:
     """)
 
     # -------------------------------------------------
-    # DAMAGE CODE SEED (최초 1회만)
+    # DAMAGE CODE SEED (최초 1회)
     # -------------------------------------------------
     cur.execute("SELECT COUNT(*) FROM damage_codes")
     if cur.fetchone()[0] == 0:
         seed_rows = [
-            # 물류
             ("물류", "수작업", "이동", "수작업 이동 중 발생"),
             ("물류", "수작업", "낙하", "수작업 중 낙하"),
             ("물류", "수작업", "충격", "수작업 중 외부 충격"),
@@ -152,34 +147,26 @@ def init_db() -> None:
             ("물류", "보관", "적재 기준 미준수", "적재 기준 위반"),
             ("물류", "보관", "장기 적재", "장기 적재로 인한 변형"),
 
-            # 사옥
             ("사옥", "수작업", "이동", "사옥 내 수작업 이동"),
             ("사옥", "수작업", "낙하", "사옥 내 수작업 낙하"),
             ("사옥", "수작업", "충격", "사옥 내 충격"),
 
-            # 운송
             ("운송", "하차", "부주의", "운송 중 부주의"),
             ("운송", "사고", "충돌", "운송 사고"),
 
-            # 하차지
             ("하차지", "수작업", "이동", "하차지 수작업 이동"),
             ("하차지", "수작업", "낙하", "하차지 수작업 낙하"),
             ("하차지", "지게차", "충격", "하차지 지게차 충격"),
 
-            # 가공공정
             ("가공공정", "업체", "재단 불량", "규격 오가공"),
             ("가공공정", "업체", "제품 파손", "가공 중 파손"),
 
-            # 원자재
             ("원자재", "생산", "제품 하자", "초기 불량"),
 
-            # 부상
             ("부상", "지게차", "충격", "지게차 작업 중 부상"),
         ]
-
         cur.executemany("""
-            INSERT OR IGNORE INTO damage_codes
-            (category, type, situation, description)
+            INSERT OR IGNORE INTO damage_codes (category, type, situation, description)
             VALUES (?, ?, ?, ?)
         """, seed_rows)
 
@@ -200,7 +187,7 @@ def upsert_inventory(
     lot: str,
     spec: str,
     qty_delta: int,
-    note: str = ""
+    note: str = "",
 ) -> None:
     now = datetime.now().isoformat(timespec="seconds")
     conn = get_db()
@@ -215,25 +202,68 @@ def upsert_inventory(
     row = cur.fetchone()
 
     if row:
-        new_qty = max(0, row["qty"] + qty_delta)
+        new_qty = max(0, int(row["qty"]) + int(qty_delta))
         cur.execute("""
             UPDATE inventory
             SET qty=?, item_name=?, note=?, updated_at=?
             WHERE id=?
-        """, (new_qty, item_name, note, now, row["id"]))
+        """, (new_qty, item_name, note, now, int(row["id"])))
     else:
         cur.execute("""
             INSERT INTO inventory
-            (warehouse, location, brand, item_code, item_name,
-             lot, spec, qty, note, updated_at)
+            (warehouse, location, brand, item_code, item_name, lot, spec, qty, note, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            warehouse, location, brand, item_code, item_name,
-            lot, spec, max(0, qty_delta), note, now
-        ))
+        """, (warehouse, location, brand, item_code, item_name, lot, spec, max(0, int(qty_delta)), note, now))
 
     conn.commit()
     conn.close()
+
+
+def query_inventory(
+    warehouse: str = "",
+    location: str = "",
+    brand: str = "",
+    item_code: str = "",
+    lot: str = "",
+    spec: str = "",
+    limit: int = 500
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params: List[Any] = []
+
+    if warehouse:
+        where.append("warehouse = ?")
+        params.append(warehouse)
+    if location:
+        where.append("location LIKE ?")
+        params.append(f"%{location}%")
+    if brand:
+        where.append("brand = ?")
+        params.append(brand)
+    if item_code:
+        where.append("item_code LIKE ?")
+        params.append(f"%{item_code}%")
+    if lot:
+        where.append("lot LIKE ?")
+        params.append(f"%{lot}%")
+    if spec:
+        where.append("spec LIKE ?")
+        params.append(f"%{spec}%")
+
+    sql = "SELECT * FROM inventory"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+
+    sql += " ORDER BY updated_at DESC LIMIT ?"
+    params.append(int(limit))
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
 
 
 # =====================================================
@@ -252,7 +282,7 @@ def add_history(
     qty: int,
     from_location: str = "",
     to_location: str = "",
-    note: str = ""
+    note: str = "",
 ) -> None:
     now = datetime.now().isoformat(timespec="seconds")
     conn = get_db()
@@ -260,56 +290,62 @@ def add_history(
 
     cur.execute("""
         INSERT INTO history
-        (type, warehouse, operator, brand, item_code,
-         item_name, lot, spec, from_location, to_location,
-         qty, note, created_at)
+        (type, warehouse, operator, brand, item_code, item_name, lot, spec,
+         from_location, to_location, qty, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        type, warehouse, operator, brand, item_code,
-        item_name, lot, spec, from_location, to_location,
-        qty, note, now
+        type, warehouse, operator, brand, item_code, item_name, lot, spec,
+        from_location, to_location, int(qty), note, now
     ))
 
     conn.commit()
     conn.close()
+
+
+def query_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
+    limit: int = 500
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params: List[Any] = []
+
+    # created_at 예: 2026-01-02T12:34:56
+    if year is not None:
+        y = f"{int(year):04d}"
+        if month is not None:
+            m = f"{int(month):02d}"
+            if day is not None:
+                d = f"{int(day):02d}"
+                prefix = f"{y}-{m}-{d}"
+            else:
+                prefix = f"{y}-{m}"
+        else:
+            prefix = y
+
+        where.append("created_at LIKE ?")
+        params.append(prefix + "%")
+
+    sql = "SELECT * FROM history"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(int(limit))
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
 
 
 # =====================================================
 # DAMAGE / CS
 # =====================================================
-
-def add_damage_history(
-    occurred_at: str,
-    warehouse: str,
-    location: str,
-    brand: str,
-    item_code: str,
-    item_name: str,
-    lot: str,
-    spec: str,
-    qty: int,
-    damage_code_id: int,
-    detail: str = ""
-) -> None:
-    now = datetime.now().isoformat(timespec="seconds")
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO damage_history
-        (occurred_at, warehouse, location, brand,
-         item_code, item_name, lot, spec,
-         qty, damage_code_id, detail, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        occurred_at, warehouse, location, brand,
-        item_code, item_name, lot, spec,
-        qty, damage_code_id, detail, now
-    ))
-
-    conn.commit()
-    conn.close()
-
 
 def list_damage_codes(
     category: str = "",
@@ -346,6 +382,39 @@ def list_damage_codes(
     return rows
 
 
+def add_damage_history(
+    occurred_at: str,
+    warehouse: str,
+    location: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty: int,
+    damage_code_id: int,
+    detail: str = ""
+) -> None:
+    now = datetime.now().isoformat(timespec="seconds")
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO damage_history
+        (occurred_at, warehouse, location, brand,
+         item_code, item_name, lot, spec,
+         qty, damage_code_id, detail, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        occurred_at, warehouse, location, brand,
+        item_code, item_name, lot, spec,
+        int(qty), int(damage_code_id), detail, now
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def query_damage_history(
     year: Optional[int] = None,
     month: Optional[int] = None,
@@ -370,12 +439,11 @@ def query_damage_history(
         FROM damage_history dh
         JOIN damage_codes dc ON dh.damage_code_id = dc.id
     """
-
     if where:
         sql += " WHERE " + " AND ".join(where)
 
     sql += " ORDER BY dh.occurred_at DESC LIMIT ?"
-    params.append(limit)
+    params.append(int(limit))
 
     cur.execute(sql, params)
     rows = [dict(r) for r in cur.fetchall()]
@@ -385,7 +453,7 @@ def query_damage_history(
 
 def query_damage_summary_by_category(
     year: Optional[int] = None,
-    month: Optional[int] = None,
+    month: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     conn = get_db()
     cur = conn.cursor()
@@ -402,13 +470,10 @@ def query_damage_summary_by_category(
             params.append(f"{year:04d}%")
 
     sql = """
-        SELECT
-            dc.category,
-            COUNT(*) AS cnt
+        SELECT dc.category, COUNT(*) AS cnt
         FROM damage_history dh
         JOIN damage_codes dc ON dh.damage_code_id = dc.id
     """
-
     if where:
         sql += " WHERE " + " AND ".join(where)
 
