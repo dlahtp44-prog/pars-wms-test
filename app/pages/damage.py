@@ -2,9 +2,12 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-templates = Jinja2Templates(directory="templates")
+from app.core.paths import TEMPLATES_DIR
+from app.db import list_damage_codes
 
 router = APIRouter(prefix="/damage", tags=["page-damage"])
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
 
 @router.get("", response_class=HTMLResponse)
 def damage_page(
@@ -17,10 +20,16 @@ def damage_page(
     lot: str = "",
     spec: str = "",
 ):
+    # -----------------------------
+    # 파손 분류 코드 조회
+    # -----------------------------
+    damage_codes = list_damage_codes(active_only=True)
+
     return templates.TemplateResponse(
         "damage.html",
         {
             "request": request,
+            # item info
             "warehouse": warehouse,
             "location": location,
             "brand": brand,
@@ -28,5 +37,7 @@ def damage_page(
             "item_name": item_name,
             "lot": lot,
             "spec": spec,
-        }
+            # damage codes
+            "damage_codes": damage_codes,
+        },
     )
