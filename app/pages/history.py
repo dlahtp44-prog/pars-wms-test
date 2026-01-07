@@ -10,6 +10,18 @@ router = APIRouter(prefix="/page/history", tags=["page-history"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def _to_int(v: str | None):
+    if v is None:
+        return None
+    v = v.strip()
+    if v == "":
+        return None
+    try:
+        return int(v)
+    except ValueError:
+        return None
+
+
 @router.get("", response_class=HTMLResponse)
 def page(
     request: Request,
@@ -18,22 +30,13 @@ def page(
     day: str | None = None,
     limit: int = 300,
 ):
-    def _to_int(v: str | None):
-        if v is None:
-            return None
-        v = v.strip()
-        if v == "":
-            return None
-        try:
-            return int(v)
-        except ValueError:
-            return None
+    rows = query_history(
+        limit=limit,
+        year=_to_int(year),
+        month=_to_int(month),
+        day=_to_int(day),
+    )
 
-    y = _to_int(year)
-    m = _to_int(month)
-    d = _to_int(day)
-
-    rows = query_history(limit=limit, year=y, month=m, day=d)
     return templates.TemplateResponse(
         "history.html",
         {
@@ -54,28 +57,17 @@ def download_excel(
     day: str | None = None,
     limit: int = 2000,
 ):
-    def _to_int(v: str | None):
-        if v is None:
-            return None
-        v = v.strip()
-        if v == "":
-            return None
-        try:
-            return int(v)
-        except ValueError:
-            return None
-
     rows = query_history(
         limit=limit,
         year=_to_int(year),
         month=_to_int(month),
         day=_to_int(day),
     )
+
     columns = [
         ("created_at", "시간"),
         ("type", "유형"),
         ("warehouse", "창고"),
-        ("location", "로케이션"),
         ("from_location", "출발로케이션"),
         ("to_location", "도착로케이션"),
         ("brand", "브랜드"),
@@ -87,10 +79,13 @@ def download_excel(
         ("note", "비고"),
         ("operator", "작업자"),
     ]
+
     data = rows_to_xlsx_bytes(rows, columns, sheet_name="이력")
-    filename = "history.xlsx"
+
     return StreamingResponse(
         iter([data]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="history.xlsx"'
+        },
     )
