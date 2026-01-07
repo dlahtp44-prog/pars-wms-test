@@ -1,17 +1,17 @@
+# app/pages/mobile_qr.py
+
 from fastapi import APIRouter, Request, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-
-from app.core.paths import TEMPLATES_DIR
 from app.db import get_db
 from app.utils.qr_format import extract_location_only
 
-router = APIRouter(prefix="/m/qr", tags=["Mobile QR"])
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+router = APIRouter(prefix="/m/qr", tags=["mobile-qr"])
+templates = Jinja2Templates(directory="templates")
 
 
 # =========================
-# 📱 QR 스캔 화면
+# 📱 QR 스캔 홈 (카메라)
 # =========================
 @router.get("", response_class=HTMLResponse)
 def qr_home(request: Request):
@@ -22,28 +22,16 @@ def qr_home(request: Request):
 
 
 # =========================
-# 📦 로케이션 재고 조회
+# 📦 QR 재고 조회 결과
 # =========================
 @router.get("/inventory", response_class=HTMLResponse)
 def qr_inventory(
     request: Request,
     qrtext: str = Query("")
 ):
-    # 🔒 qrtext 방어
-    if not qrtext:
-        return templates.TemplateResponse(
-            "mobile/qr_inventory.html",
-            {
-                "request": request,
-                "location": "",
-                "items": [],
-                "error": "QR 값이 전달되지 않았습니다."
-            }
-        )
+    location = extract_location_only(qrtext or "")
 
-    # 🔑 로케이션만 추출
-    location = extract_location_only(qrtext)
-
+    # 🔒 방어코드 (500 방지)
     if not location:
         return templates.TemplateResponse(
             "mobile/qr_inventory.html",
@@ -51,7 +39,7 @@ def qr_inventory(
                 "request": request,
                 "location": "",
                 "items": [],
-                "error": "로케이션 QR만 조회할 수 있습니다."
+                "error": "❌ 로케이션 QR만 조회할 수 있습니다."
             }
         )
 
@@ -60,6 +48,8 @@ def qr_inventory(
 
     cur.execute("""
         SELECT
+            warehouse,
+            location,
             brand,
             item_code,
             item_name,
@@ -76,12 +66,14 @@ def qr_inventory(
 
     items = [
         {
-            "brand": r[0],
-            "item_code": r[1],
-            "item_name": r[2],
-            "lot": r[3],
-            "spec": r[4],
-            "qty": r[5],
+            "warehouse": r[0],
+            "location": r[1],
+            "brand": r[2],
+            "item_code": r[3],
+            "item_name": r[4],
+            "lot": r[5],
+            "spec": r[6],
+            "qty": r[7],
         }
         for r in rows
     ]
