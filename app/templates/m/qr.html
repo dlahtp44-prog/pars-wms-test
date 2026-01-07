@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>QR 스캔</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+<h3>QR 스캔</h3>
+
+<div id="reader" style="width:100%"></div>
+
+<script>
+const qr = new Html5Qrcode("reader");
+qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (text) => {
+        window.location.href = "/m/qr/inventory?qrtext=" + encodeURIComponent(text);
+        qr.stop();
+    }
+);
+</script>
+</body>
+</html>
