@@ -8,23 +8,33 @@ from app.db import init_db
 # FastAPI APP
 # =====================================================
 
-app = FastAPI(title="PARS WMS", version="1.6.6-qr")
-
+app = FastAPI(
+    title="PARS WMS",
+    version="1.6.6-qr"
+)
 
 @app.on_event("startup")
 def on_startup():
+    """
+    - DB 초기화 / 마이그레이션
+    - 서비스 기동 시 1회 실행
+    """
     init_db()
 
 
 # =====================================================
-# STATIC
+# STATIC FILES
 # =====================================================
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount(
+    "/static",
+    StaticFiles(directory=str(STATIC_DIR)),
+    name="static"
+)
 
 
 # =====================================================
-# PC PAGES
+# PC PAGE ROUTERS
 # =====================================================
 
 from app.pages.index import router as index_router
@@ -37,6 +47,7 @@ from app.pages.excel_center import router as excel_center_page_router
 from app.pages.excel_inbound import router as excel_inbound_page_router
 from app.pages.excel_outbound import router as excel_outbound_page_router
 from app.pages.damage import router as damage_page_router
+from app.pages.damage_history import router as damage_history_page_router
 
 app.include_router(index_router)
 app.include_router(inbound_page_router)
@@ -48,10 +59,11 @@ app.include_router(excel_center_page_router)
 app.include_router(excel_inbound_page_router)
 app.include_router(excel_outbound_page_router)
 app.include_router(damage_page_router)
+app.include_router(damage_history_page_router)
 
 
 # =====================================================
-# MOBILE PAGES
+# MOBILE PAGE ROUTERS
 # =====================================================
 
 from app.pages.mobile_home import router as mobile_home_router
