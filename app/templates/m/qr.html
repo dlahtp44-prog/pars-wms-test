@@ -4,23 +4,72 @@
     <meta charset="UTF-8">
     <title>QR 스캔</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- QR 라이브러리 -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 12px;
+        }
+        h3 {
+            margin-bottom: 8px;
+        }
+        #reader {
+            width: 100%;
+            min-height: 300px;
+            border: 1px solid #ccc;
+        }
+        .hint {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+        .error {
+            margin-top: 8px;
+            color: red;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
+
 <h3>QR 스캔 (로케이션)</h3>
-<div id="reader" style="width:100%"></div>
+<div id="reader"></div>
+<div id="msg" class="hint">카메라를 로케이션 QR에 맞춰주세요</div>
 
 <script>
+const msg = document.getElementById("msg");
 const html5QrCode = new Html5Qrcode("reader");
 
-html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    qrText => {
-        window.location.href =
-            "/m/qr/inventory?qrtext=" + encodeURIComponent(qrText);
+Html5Qrcode.getCameras().then(devices => {
+    if (!devices || devices.length === 0) {
+        msg.innerHTML = "❌ 카메라를 찾을 수 없습니다.";
+        msg.className = "error";
+        return;
     }
-);
+
+    html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (qrText) => {
+            html5QrCode.stop().then(() => {
+                window.location.href =
+                    "/m/qr/inventory?qrtext=" + encodeURIComponent(qrText);
+            });
+        },
+        (errorMessage) => {
+            // 스캔 중 오류는 무시 (로그만)
+            console.log("QR scan error:", errorMessage);
+        }
+    );
+}).catch(err => {
+    msg.innerHTML = "❌ 카메라 접근 실패: HTTPS 환경인지 확인하세요";
+    msg.className = "error";
+});
 </script>
+
 </body>
 </html>
