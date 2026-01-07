@@ -22,7 +22,7 @@ def qr_home(request: Request):
 
 
 # =========================
-# 📦 QR 재고 조회 결과
+# 📦 QR 재고 조회
 # URL: /m/qr/inventory?qrtext=...
 # =========================
 @router.get("/qr/inventory")
