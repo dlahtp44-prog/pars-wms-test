@@ -1,4 +1,3 @@
-# app/utils/qr_format.py
 import re
 
 # =========================
@@ -27,18 +26,18 @@ def extract_item_fields(text: str):
 
 
 # =========================
-# 로케이션 QR → location 값만 추출 (★핵심★)
+# ✅ 로케이션 QR만 허용 (★단일 정의★)
 # =========================
 def extract_location_only(text: str) -> str:
     """
-    허용 포맷:
+    허용:
     - D01-01
     - B01-02-A
     - type=LOC&warehouse=MAIN&location=D01-01
 
-    차단 포맷:
-    - type=ITEM...
-    - 품번:xxx/LOT:xxx
+    차단:
+    - ITEM QR
+    - 품번 QR
     """
 
     if not text:
@@ -50,17 +49,16 @@ def extract_location_only(text: str) -> str:
     if is_item_qr(text):
         return ""
 
-    # ❌ ITEM 파라미터 차단
     if "type=ITEM" in text:
         return ""
 
-    # URL 파라미터에서 location 추출
+    # URL 파라미터 location 추출
     if "location=" in text:
         value = text.split("location=")[-1]
         value = value.split("&")[0].strip()
         return value
 
-    # 순수 로케이션 패턴만 허용
+    # 순수 로케이션만 허용
     m = re.fullmatch(r"[A-Z]\d{2}-\d{2}(-[A-Z])?", text)
     return m.group(0) if m else ""
 
