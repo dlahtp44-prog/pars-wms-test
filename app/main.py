@@ -15,19 +15,20 @@ from app.pages.excel_center import router as excel_center_page_router
 from app.pages.excel_inbound import router as excel_inbound_page_router
 from app.pages.excel_outbound import router as excel_outbound_page_router
 
-# mobile pages
+# pages (mobile)
 from app.pages.mobile_home import router as mobile_home_router
 from app.pages.mobile_qr import router as mobile_qr_router
 from app.pages.mobile_qr_inventory import router as mobile_qr_inventory_router
 from app.pages.mobile_inventory_detail import router as mobile_inventory_detail_router
 from app.pages.mobile_move import router as mobile_move_router
 
-# api
+# api routers
 from app.routers.api_inbound import router as api_inbound_router
 from app.routers.api_outbound import router as api_outbound_router
 from app.routers.api_move import router as api_move_router
 from app.routers.api_inventory import router as api_inventory_router
 from app.routers.api_history import router as api_history_router
+from app.routers.api_damage_codes import router as api_damage_codes_router
 from app.routers.excel_inbound import router as api_excel_inbound_router
 from app.routers.excel_outbound import router as api_excel_outbound_router
 
@@ -64,5 +65,6 @@ app.include_router(api_outbound_router)
 app.include_router(api_move_router)
 app.include_router(api_inventory_router)
 app.include_router(api_history_router)
+app.include_router(api_damage_codes_router)
 app.include_router(api_excel_inbound_router)
 app.include_router(api_excel_outbound_router)
