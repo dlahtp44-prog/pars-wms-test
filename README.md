@@ -1,1 +1,0 @@
-# PARS WMS\n\nFull reset base with core routers.
