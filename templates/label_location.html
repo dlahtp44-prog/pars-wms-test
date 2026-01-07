@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <title>로케이션 라벨 - PARS WMS</title>
+  <style>
+    @media print { body { background:white; } .noprint{display:none;} }
+    .label {
+      width: 70mm;
+      height: 40mm;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 6px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      background:white;
+      color:black;
+    }
+    .qr { width: 30mm; height: 30mm; background:white; padding:2mm; border-radius:6px; }
+    .loc { flex:1; font-size: 18px; font-weight: 800; letter-spacing: 0.5px; word-break:break-all; }
+  </style>
+</head>
+<body>
+<div class="container noprint">
+  <div class="card">
+    <h1>로케이션 라벨</h1>
+    <form id="f">
+      <label>로케이션</label><input name="location" placeholder="예: B01-01-02-A" required>
+      <button type="submit">라벨 생성</button>
+    </form>
+    <p><a href="/page/labels">← 라벨 메뉴</a></p>
+  </div>
+</div>
+
+<div class="container">
+  <div id="label" class="label" style="margin:16px auto;">
+    <div class="qr"><canvas id="qrc"></canvas></div>
+    <div class="loc" id="t_loc">B01-01-02-A</div>
+  </div>
+  <div class="noprint" style="text-align:center; margin-bottom:20px;">
+    <button onclick="window.print()">인쇄</button>
+  </div>
+</div>
+
+<script>
+function buildQR(v){
+  const c=document.getElementById('qrc');
+  QRCode.toCanvas(c, v, {margin:1, width:190}, function (error) {
+    if (error) console.error(error);
+  });
+}
+document.getElementById('f').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const fd=new FormData(e.target);
+  const location=fd.get('location')||'';
+  document.getElementById('t_loc').textContent = location;
+  buildQR(location);
+});
+buildQR('B01-01-02-A');
+</script>
+</body>
+</html>
