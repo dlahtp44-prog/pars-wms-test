@@ -21,13 +21,15 @@ def inbound(
     # -----------------------------
     # validation
     # -----------------------------
-    if qty is None or int(qty) <= 0:
-        raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
+    if qty is None or str(qty).strip() == "":
+        raise HTTPException(status_code=400, detail="수량은 필수입니다.")
 
     qty = int(qty)
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
 
     # -----------------------------
-    # inventory upsert
+    # inventory
     # -----------------------------
     upsert_inventory(
         warehouse=warehouse,
@@ -42,8 +44,7 @@ def inbound(
     )
 
     # -----------------------------
-    # history 기록 (입고)
-    # ★ 핵심 수정 포인트
+    # history
     # -----------------------------
     add_history(
         type="입고",
@@ -61,7 +62,7 @@ def inbound(
     )
 
     # -----------------------------
-    # QR 데이터 반환
+    # QR
     # -----------------------------
     return {
         "ok": True,
