@@ -1,7 +1,9 @@
+# app/utils/qr_format.py
 import re
 
+
 # =========================
-# 품목 QR 판별
+# ITEM QR 판별
 # =========================
 def is_item_qr(text: str) -> bool:
     if not text:
@@ -10,7 +12,7 @@ def is_item_qr(text: str) -> bool:
 
 
 # =========================
-# 품목 QR 필드 추출
+# ITEM QR 필드 추출
 # =========================
 def extract_item_fields(text: str):
     def pick(label):
@@ -26,20 +28,9 @@ def extract_item_fields(text: str):
 
 
 # =========================
-# ✅ 로케이션 QR만 허용 (★단일 정의★)
+# 🔑 로케이션 QR만 허용
 # =========================
 def extract_location_only(text: str) -> str:
-    """
-    허용:
-    - D01-01
-    - B01-02-A
-    - type=LOC&warehouse=MAIN&location=D01-01
-
-    차단:
-    - ITEM QR
-    - 품번 QR
-    """
-
     if not text:
         return ""
 
@@ -49,36 +40,16 @@ def extract_location_only(text: str) -> str:
     if is_item_qr(text):
         return ""
 
+    # ❌ ITEM URL 차단
     if "type=ITEM" in text:
         return ""
 
-    # URL 파라미터 location 추출
+    # URL 파라미터 방식
     if "location=" in text:
         value = text.split("location=")[-1]
         value = value.split("&")[0].strip()
         return value
 
-    # 순수 로케이션만 허용
+    # 순수 로케이션 패턴만 허용
     m = re.fullmatch(r"[A-Z]\d{2}-\d{2}(-[A-Z])?", text)
     return m.group(0) if m else ""
-
-
-# =========================
-# 품목 QR 생성 (v1.8 기준)
-# =========================
-def build_item_qr(
-    item_code: str,
-    item_name: str,
-    lot: str,
-    spec: str,
-    brand: str | None = None,
-) -> str:
-    qr = (
-        f"품번:{item_code}/"
-        f"품명:{item_name}/"
-        f"LOT:{lot}/"
-        f"규격:{spec}"
-    )
-    if brand:
-        qr += f"/브랜드:{brand}"
-    return qr
