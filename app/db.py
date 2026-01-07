@@ -349,3 +349,38 @@ def query_damage_history(limit: int = 500) -> List[Dict[str, Any]]:
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+def query_damage_summary_by_category(
+    year: int | None = None,
+    month: int | None = None,
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params = []
+
+    if year:
+        if month:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}-{month:02d}%")
+        else:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}%")
+
+    sql = """
+        SELECT
+            dc.category,
+            COUNT(*) AS cnt
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+    """
+
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+
+    sql += " GROUP BY dc.category ORDER BY cnt DESC"
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
