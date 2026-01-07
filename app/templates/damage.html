@@ -5,43 +5,55 @@
     <title>CS / 파손 등록</title>
 </head>
 <body>
+
 <h2>CS / 파손 등록</h2>
 
 <form method="post" action="/api/damage">
-    발생일 <input type="date" name="occurred_at" required><br><br>
 
-    창고 <input name="warehouse" required><br>
-    로케이션 <input name="location" required><br>
-    브랜드 <input name="brand"><br>
+    <label>발생일</label><br>
+    <input type="date" name="occurred_at" required><br><br>
 
-    품번 <input name="item_code" required><br>
-    품명 <input name="item_name" required><br>
-    LOT <input name="lot" required><br>
-    규격 <input name="spec" required><br>
-    수량 <input type="number" name="qty" required><br><br>
+    <label>창고</label><br>
+    <input type="text" name="warehouse" value="{{ warehouse }}"><br>
 
-    파손 유형
-    <select name="damage_code_id" id="damage_code_id" required></select><br><br>
+    <label>로케이션</label><br>
+    <input type="text" name="location" value="{{ location }}"><br>
 
-    상세 내용<br>
-    <textarea name="detail" rows="4" cols="50"></textarea><br><br>
+    <label>브랜드</label><br>
+    <input type="text" name="brand" value="{{ brand }}"><br>
 
+    <label>품번</label><br>
+    <input type="text" name="item_code" value="{{ item_code }}"><br>
+
+    <label>품명</label><br>
+    <input type="text" name="item_name" value="{{ item_name }}"><br>
+
+    <label>LOT</label><br>
+    <input type="text" name="lot" value="{{ lot }}"><br>
+
+    <label>규격</label><br>
+    <input type="text" name="spec" value="{{ spec }}"><br>
+
+    <label>수량</label><br>
+    <input type="number" name="qty" min="1" required><br><br>
+
+    <label>파손 유형</label><br>
+    <select name="damage_code_id" required>
+        <option value="">선택</option>
+        {% for c in damage_codes %}
+            <option value="{{ c.id }}">
+                {{ c.category }} / {{ c.type }} / {{ c.situation }}
+            </option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>상세 내용</label><br>
+    <textarea name="detail" rows="4" cols="40"></textarea><br><br>
+
+    <!-- ✅ 이 버튼이 핵심 -->
     <button type="submit">등록</button>
-</form>
 
-<script>
-fetch("/api/damage-codes")
-  .then(res => res.json())
-  .then(data => {
-    const sel = document.getElementById("damage_code_id");
-    data.rows.forEach(r => {
-      const opt = document.createElement("option");
-      opt.value = r.id;
-      opt.text = `${r.category} / ${r.type} / ${r.situation}`;
-      sel.appendChild(opt);
-    });
-  });
-</script>
+</form>
 
 </body>
 </html>
