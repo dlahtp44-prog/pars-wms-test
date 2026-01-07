@@ -1,19 +1,19 @@
-# app/pages/mobile_qr.py
-
 from fastapi import APIRouter, Request, Query
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+
+from app.core.paths import TEMPLATES_DIR
 from app.db import get_db
 from app.utils.qr_format import extract_location_only
 
-router = APIRouter(prefix="/m", tags=["Mobile QR"])
-templates = Jinja2Templates(directory="templates")
+router = APIRouter(prefix="/m/qr", tags=["Mobile QR"])
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 # =========================
-# 📱 QR 스캔 홈 (카메라 화면)
-# URL: /m/qr
+# 📱 QR 스캔 화면
 # =========================
-@router.get("/qr")
+@router.get("", response_class=HTMLResponse)
 def qr_home(request: Request):
     return templates.TemplateResponse(
         "mobile/qr.html",
@@ -22,15 +22,26 @@ def qr_home(request: Request):
 
 
 # =========================
-# 📦 QR 재고 조회
-# URL: /m/qr/inventory?qrtext=...
+# 📦 로케이션 재고 조회
 # =========================
-@router.get("/qr/inventory")
+@router.get("/inventory", response_class=HTMLResponse)
 def qr_inventory(
     request: Request,
-    qrtext: str = Query(...)
+    qrtext: str = Query("")
 ):
-    # 🔑 로케이션만 추출 (ITEM QR 완전 차단)
+    # 🔒 qrtext 방어
+    if not qrtext:
+        return templates.TemplateResponse(
+            "mobile/qr_inventory.html",
+            {
+                "request": request,
+                "location": "",
+                "items": [],
+                "error": "QR 값이 전달되지 않았습니다."
+            }
+        )
+
+    # 🔑 로케이션만 추출
     location = extract_location_only(qrtext)
 
     if not location:
@@ -49,8 +60,6 @@ def qr_inventory(
 
     cur.execute("""
         SELECT
-            warehouse,
-            location,
             brand,
             item_code,
             item_name,
@@ -67,14 +76,12 @@ def qr_inventory(
 
     items = [
         {
-            "warehouse": r[0],
-            "location": r[1],
-            "brand": r[2],
-            "item_code": r[3],
-            "item_name": r[4],
-            "lot": r[5],
-            "spec": r[6],
-            "qty": r[7],
+            "brand": r[0],
+            "item_code": r[1],
+            "item_name": r[2],
+            "lot": r[3],
+            "spec": r[4],
+            "qty": r[5],
         }
         for r in rows
     ]
