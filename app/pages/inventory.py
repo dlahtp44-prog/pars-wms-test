@@ -28,6 +28,7 @@ def page(
         lot=lot,
         spec=spec,
     )
+
     return templates.TemplateResponse(
         "inventory.html",
         {
@@ -60,6 +61,7 @@ def download_excel(
         lot=lot,
         spec=spec,
     )
+
     columns = [
         ("warehouse", "창고"),
         ("location", "로케이션"),
@@ -72,10 +74,13 @@ def download_excel(
         ("note", "비고"),
         ("updated_at", "수정일시"),
     ]
+
     data = rows_to_xlsx_bytes(rows, columns, sheet_name="재고현황")
-    filename = "inventory.xlsx"
+
     return StreamingResponse(
         iter([data]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="inventory.xlsx"'
+        },
     )
