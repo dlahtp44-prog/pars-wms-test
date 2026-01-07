@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="/static/app.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <title>품목 라벨 - PARS WMS</title>
+  <style>
+    /* 인쇄 라벨 사이즈 */
+    @media print {
+      body { background: white; }
+      .noprint { display:none; }
+    }
+    .label {
+      width: 70mm;
+      height: 40mm;
+      border: 1px solid #2a2f3a;
+      border-radius: 8px;
+      padding: 6px;
+      display:flex;
+      gap:8px;
+      background: #0f1116;
+    }
+    .label.light { background:white; color:black; border:1px solid #222; }
+    .qr { width: 28mm; height: 28mm; background:white; padding:2mm; border-radius:6px; }
+    .txt { flex:1; font-size: 11px; line-height:1.15; }
+    .txt .code { font-weight:700; font-size: 12px; }
+    .row { margin-bottom:2px; word-break:break-all; }
+  </style>
+</head>
+<body>
+<div class="container noprint">
+  <div class="card">
+    <h1>품목 라벨</h1>
+    <form id="f">
+      <label>품번</label><input name="item_code" required>
+      <label>품명</label><input name="item_name" required>
+      <label>LOT</label><input name="lot" required>
+      <label>규격</label><input name="spec" required>
+      <label>라벨 배경</label>
+      <select name="theme">
+        <option value="dark" selected>다크(화면용)</option>
+        <option value="light">라이트(인쇄 권장)</option>
+      </select>
+      <button type="submit">라벨 생성</button>
+    </form>
+    <p class="small">QR 값: 품번/품명/LOT/규격 (v1.7 기준 유지)</p>
+    <p><a href="/page/labels">← 라벨 메뉴</a></p>
+  </div>
+</div>
+
+<div class="container">
+  <div id="label" class="label light" style="margin:16px auto;">
+    <div class="qr"><canvas id="qrc"></canvas></div>
+    <div class="txt">
+      <div class="row code" id="t_code">품번:</div>
+      <div class="row" id="t_name">품명:</div>
+      <div class="row" id="t_lot">LOT:</div>
+      <div class="row" id="t_spec">규격:</div>
+    </div>
+  </div>
+  <div class="noprint" style="text-align:center; margin-bottom:20px;">
+    <button onclick="window.print()">인쇄</button>
+  </div>
+</div>
+
+<script>
+function buildQR(v){
+  const c=document.getElementById('qrc');
+  QRCode.toCanvas(c, v, {margin:1, width:180}, function (error) {
+    if (error) console.error(error);
+  });
+}
+document.getElementById('f').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const fd=new FormData(e.target);
+  const item_code=fd.get('item_code')||'';
+  const item_name=fd.get('item_name')||'';
+  const lot=fd.get('lot')||'';
+  const spec=fd.get('spec')||'';
+  const theme=fd.get('theme')||'light';
+  const qrVal = `품번:${item_code}/품명:${item_name}/LOT:${lot}/규격:${spec}`;
+
+  document.getElementById('t_code').textContent = `품번: ${item_code}`;
+  document.getElementById('t_name').textContent = `품명: ${item_name}`;
+  document.getElementById('t_lot').textContent = `LOT: ${lot}`;
+  document.getElementById('t_spec').textContent = `규격: ${spec}`;
+
+  const label=document.getElementById('label');
+  label.classList.remove('light');
+  if(theme==='light') label.classList.add('light');
+  buildQR(qrVal);
+});
+buildQR('PARS WMS');
+</script>
+</body>
+</html>
