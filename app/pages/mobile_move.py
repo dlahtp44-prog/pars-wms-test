@@ -39,7 +39,6 @@ def from_scan(request: Request):
 
 @router.post("/from/submit")
 def from_submit(qrtext: str = Form(...)):
-    # 🔑 핵심: QR 문자열에서 로케이션만 추출
     from_location = extract_location_only(qrtext or "")
     return RedirectResponse(
         url=f"/m/move/select?from_location={from_location}",
@@ -52,11 +51,9 @@ def from_submit(qrtext: str = Form(...)):
 # =========================
 @router.get("/select", response_class=HTMLResponse)
 def select_item(request: Request, from_location: str):
-    # 🔑 URL로 넘어온 값도 다시 정규화
     from_location = extract_location_only(from_location or "")
 
     rows = query_inventory(location=from_location)
-    # 수량 있는 것만
     rows = [r for r in rows if int(r.get("qty", 0) or 0) > 0]
 
     return templates.TemplateResponse(
@@ -78,8 +75,6 @@ def select_submit(
     note: str = Form(""),
 ):
     from_location = extract_location_only(from_location or "")
-    operator = (operator or "").strip()
-    note = (note or "").strip()
 
     try:
         qty = int(qty)
@@ -92,7 +87,6 @@ def select_submit(
             status_code=303,
         )
 
-    # pick: warehouse|||brand|||item_code|||item_name|||lot|||spec
     parts = (pick or "").split("|||")
     if len(parts) != 6:
         return RedirectResponse(
@@ -102,7 +96,6 @@ def select_submit(
 
     warehouse, brand, item_code, item_name, lot, spec = [p.strip() for p in parts]
 
-    # 현재 재고 확인
     rows = query_inventory(
         warehouse=warehouse,
         location=from_location,
@@ -139,7 +132,7 @@ def select_submit(
 
 
 # =========================
-# 3) 도착 로케이션 스캔
+# 3) 도착 로케이션 스캔 + 이동 완료
 # =========================
 @router.get("/to", response_class=HTMLResponse)
 def to_scan(
@@ -157,15 +150,15 @@ def to_scan(
 ):
     hidden = {
         "warehouse": warehouse,
-        "from_location": extract_location_only(from_location or ""),
-        "brand": brand or "",
-        "item_code": item_code or "",
-        "item_name": item_name or "",
-        "lot": lot or "",
-        "spec": spec or "",
+        "from_location": extract_location_only(from_location),
+        "brand": brand,
+        "item_code": item_code,
+        "item_name": item_name,
+        "lot": lot,
+        "spec": spec,
         "qty": str(qty),
-        "operator": operator or "",
-        "note": note or "",
+        "operator": operator,
+        "note": note,
     }
 
     return templates.TemplateResponse(
@@ -184,4 +177,84 @@ def to_scan(
 def to_submit(
     request: Request,
     qrtext: str = Form(...),
-    warehouse: str = Form(..
+    warehouse: str = Form(...),
+    from_location: str = Form(...),
+    brand: str = Form(""),
+    item_code: str = Form(...),
+    item_name: str = Form(...),
+    lot: str = Form(...),
+    spec: str = Form(...),
+    qty: int = Form(...),
+    operator: str = Form(""),
+    note: str = Form(""),
+):
+    to_location = extract_location_only(qrtext or "")
+    from_location = extract_location_only(from_location or "")
+
+    try:
+        qty = int(qty)
+    except:
+        qty = 0
+
+    rows = query_inventory(
+        warehouse=warehouse,
+        location=from_location,
+        brand=brand,
+        item_code=item_code,
+        lot=lot,
+        spec=spec,
+    )
+    available = int(rows[0].get("qty", 0)) if rows else 0
+
+    if qty <= 0 or qty > available:
+        return RedirectResponse(
+            url=f"/m/move/select?from_location={from_location}",
+            status_code=303,
+        )
+
+    upsert_inventory(
+        warehouse=warehouse,
+        location=from_location,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        qty_delta=-qty,
+        note=note,
+    )
+    upsert_inventory(
+        warehouse=warehouse,
+        location=to_location,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        qty_delta=qty,
+        note=note,
+    )
+
+    add_history(
+        type_="이동",
+        warehouse=warehouse,
+        operator=operator,
+        brand=brand,
+        item_code=item_code,
+        item_name=item_name,
+        lot=lot,
+        spec=spec,
+        from_location=from_location,
+        to_location=to_location,
+        qty=qty,
+        note=note,
+    )
+
+    return templates.TemplateResponse(
+        "m/move_done.html",
+        {
+            "request": request,
+            "msg": f"이동 완료: {from_location} → {to_location} ({qty})",
+            "to_location": to_location,
+        },
+    )
