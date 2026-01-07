@@ -248,3 +248,159 @@ def query_history(
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+# =====================================================
+# DAMAGE / CS
+# =====================================================
+
+def list_damage_codes(
+    category: str = "",
+    type: str = "",
+    situation: str = "",
+    active_only: bool = True,
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params = []
+
+    if active_only:
+        where.append("is_active = 1")
+    if category:
+        where.append("category = ?")
+        params.append(category)
+    if type:
+        where.append("type = ?")
+        params.append(type)
+    if situation:
+        where.append("situation = ?")
+        params.append(situation)
+
+    sql = "SELECT * FROM damage_codes"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY category, type, situation"
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_damage_history(
+    occurred_at: str,
+    warehouse: str,
+    location: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty: float,
+    damage_code_id: int,
+    detail: str = "",
+    deduct_inventory: bool = False,
+):
+    now = datetime.now().isoformat(timespec="seconds")
+
+    qty = _q3(qty)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO damage_history
+        (occurred_at, warehouse, location, brand,
+         item_code, item_name, lot, spec,
+         qty, damage_code_id, detail, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        occurred_at, warehouse, location, brand,
+        item_code, item_name, lot, spec,
+        qty, int(damage_code_id), detail, now
+    ))
+
+    conn.commit()
+    conn.close()
+
+    # 옵션: CS 발생 시 재고 차감
+    if deduct_inventory:
+        upsert_inventory(
+            warehouse=warehouse,
+            location=location,
+            brand=brand,
+            item_code=item_code,
+            item_name=item_name,
+            lot=lot,
+            spec=spec,
+            qty_delta=-qty,
+            note="CS 차감",
+        )
+
+
+def query_damage_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    limit: int = 500,
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params = []
+
+    if year:
+        if month:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}-{month:02d}%")
+        else:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}%")
+
+    sql = """
+        SELECT dh.*, dc.category, dc.type, dc.situation
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY dh.occurred_at DESC, dh.id DESC LIMIT ?"
+    params.append(limit)
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def query_damage_summary_by_category(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    where = []
+    params = []
+
+    if year:
+        if month:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}-{month:02d}%")
+        else:
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{year:04d}%")
+
+    sql = """
+        SELECT dc.category, COUNT(*) AS cnt
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " GROUP BY dc.category ORDER BY cnt DESC"
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
