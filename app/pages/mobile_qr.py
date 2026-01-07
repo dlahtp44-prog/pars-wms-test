@@ -2,38 +2,37 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.db import get_db
+from app.core.paths import TEMPLATES_DIR
+from app.db import query_inventory
 from app.utils.qr_format import extract_location_only
 
-router = APIRouter()
-templates = Jinja2Templates(directory="templates")
+router = APIRouter(prefix="/m/qr", tags=["mobile-qr"])
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
-@router.get("/m/qr/inventory", response_class=HTMLResponse)
-def qr_inventory(request: Request):
-    raw_location = request.query_params.get("location", "")
-    location = extract_location_only(raw_location)
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT warehouse, location, brand, item_code, item_name, lot, spec, qty
-        FROM inventory
-        WHERE location = ?
-        ORDER BY item_code
-        """,
-        (location,),
+@router.get("", response_class=HTMLResponse)
+def qr_home(request: Request):
+    return templates.TemplateResponse(
+        "mobile/qr.html",
+        {"request": request},
     )
 
-    rows = cur.fetchall()
+
+@router.get("/inventory", response_class=HTMLResponse)
+def qr_inventory(request: Request, location: str = ""):
+    # 🔑 핵심: QR 전체 문자열 → 로케이션만 추출
+    location_only = extract_location_only(location or "")
+
+    items = []
+    if location_only:
+        items = query_inventory(location=location_only)
+        items = [r for r in items if int(r.get("qty", 0) or 0) > 0]
 
     return templates.TemplateResponse(
         "mobile/qr_inventory.html",
         {
             "request": request,
-            "location": location,
-            "items": rows,
+            "location": location_only,
+            "items": items,
         },
     )
