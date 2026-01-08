@@ -1,12 +1,43 @@
-from fastapi import UploadFile, File
+from fastapi import (
+    APIRouter,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
 import pandas as pd
 import io
+
+from app.core.paths import TEMPLATES_DIR
+
+
+# =====================================================
+# ROUTER
+# =====================================================
+
+router = APIRouter(
+    prefix="/label",
+    tags=["라벨출력"]
+)
+
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+# =====================================================
+# 로케이션 엑셀 업로드 → 라벨 출력
+# =====================================================
+
 @router.get("/로케이션/excel", response_class=HTMLResponse)
 def label_location_excel_form(request: Request):
     return templates.TemplateResponse(
         "label_location_excel_form.html",
         {"request": request}
     )
+
+
 @router.post("/로케이션/excel/preview", response_class=HTMLResponse)
 async def label_location_excel_preview(
     request: Request,
@@ -17,11 +48,13 @@ async def label_location_excel_preview(
     content = await file.read()
     df = pd.read_excel(io.BytesIO(content))
 
-    # 컬럼명 정규화
     df.columns = [c.lower().strip() for c in df.columns]
 
     if "location" not in df.columns:
-        return HTMLResponse("엑셀에 'location' 컬럼이 없습니다.", status_code=400)
+        return HTMLResponse(
+            "엑셀에 'location' 컬럼이 없습니다.",
+            status_code=400
+        )
 
     locations = (
         df["location"]
@@ -40,6 +73,8 @@ async def label_location_excel_preview(
             "qty": qty,
         },
     )
+
+
 @router.post("/로케이션/excel/print", response_class=HTMLResponse)
 def label_location_excel_print(
     request: Request,
@@ -49,7 +84,7 @@ def label_location_excel_print(
 ):
     try:
         width_mm, height_mm = map(int, size.split("x"))
-    except:
+    except Exception:
         width_mm, height_mm = 70, 40
 
     return templates.TemplateResponse(
@@ -62,9 +97,11 @@ def label_location_excel_print(
             "height_mm": height_mm,
         },
     )
-# ===============================
+
+
+# =====================================================
 # 제품 엑셀 업로드 → 라벨 출력
-# ===============================
+# =====================================================
 
 @router.get("/제품/excel", response_class=HTMLResponse)
 def label_item_excel_form(request: Request):
@@ -84,7 +121,6 @@ async def label_item_excel_preview(
     content = await file.read()
     df = pd.read_excel(io.BytesIO(content))
 
-    # 컬럼명 정규화
     df.columns = [c.lower().strip() for c in df.columns]
 
     required = {"code", "name", "lot", "spec"}
@@ -124,7 +160,7 @@ def label_item_excel_print(
 ):
     try:
         width_mm, height_mm = map(int, size.split("x"))
-    except:
+    except Exception:
         width_mm, height_mm = 70, 40
 
     items = [
