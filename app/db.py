@@ -492,37 +492,73 @@ def list_damage_codes(category: str = "", type: str = "", situation: str = "", a
         conn.close()
 
 
-def add_damage_history(data: Dict[str, Any]) -> None:
-    """파손 내역 기록"""
+def add_damage_history(
+    occurred_at: str,
+    warehouse: str,
+    location: str,
+    brand: str,
+    item_code: str,
+    item_name: str,
+    lot: str,
+    spec: str,
+    qty: float,
+    damage_code_id: int,
+    detail: str = "",
+    deduct_inventory: bool = False,
+):
+    """
+    CS / 파손 등록
+    - damage_history 저장
+    - deduct_inventory=True 시 재고 차감
+    """
     conn = get_db()
     try:
         cur = conn.cursor()
         now = datetime.now().isoformat(timespec="seconds")
-        cur.execute(
-            """
+        q = _q3(qty)
+
+        # 1️⃣ 파손 이력 저장
+        cur.execute("""
             INSERT INTO damage_history (
-                occurred_at, warehouse, location, brand, item_code,
-                item_name, lot, spec, qty, damage_code_id, detail, created_at
+                occurred_at, warehouse, location, brand,
+                item_code, item_name, lot, spec,
+                qty, damage_code_id, detail, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                _norm(data.get("occurred_at", "")),
-                _norm(data.get("warehouse", "")),
-                _norm(data.get("location", "")),
-                _norm(data.get("brand", "")),
-                _norm(data.get("item_code", "")),
-                _norm(data.get("item_name", "")),
-                _norm(data.get("lot", "")),
-                _norm(data.get("spec", "")),
-                _q3(data.get("qty", 0)),
-                int(data.get("damage_code_id", 0)),
-                _norm(data.get("detail", "")),
-                now,
-            ),
-        )
+        """, (
+            _norm(occurred_at),
+            _norm(warehouse),
+            _norm(location),
+            _norm(brand),
+            _norm(item_code),
+            _norm(item_name),
+            _norm(lot),
+            _norm(spec),
+            q,
+            int(damage_code_id),
+            _norm(detail),
+            now,
+        ))
+
+        # 2️⃣ 재고 차감 (선택)
+        if deduct_inventory:
+            ok = upsert_inventory(
+                warehouse=warehouse,
+                location=location,
+                brand=brand,
+                item_code=item_code,
+                item_name=item_name,
+                lot=lot,
+                spec=spec,
+                qty_delta=-q,
+                note="CS 차감",
+            )
+            if not ok:
+                raise ValueError("재고 부족으로 CS 차감 실패")
+
         conn.commit()
     finally:
         conn.close()
+
 
 
 def query_damage_history(year: Optional[int] = None, month: Optional[int] = None, limit: int = 500) -> List[Dict[str, Any]]:
