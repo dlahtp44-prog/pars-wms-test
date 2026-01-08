@@ -1,17 +1,12 @@
 from fastapi import APIRouter, Form, HTTPException
-from app.db import (
-    upsert_inventory,
-    add_history,
-    resolve_inventory_brand_and_name,
-)
+from app.db import upsert_inventory, add_history
 
 router = APIRouter(prefix="/api/outbound", tags=["출고"])
-
 
 @router.post("")
 def outbound(
     warehouse: str = Form(...),
-    location: str = Form(...),
+    from_location: str = Form(...),
     brand: str = Form(""),
     item_code: str = Form(...),
     item_name: str = Form(""),
@@ -21,26 +16,12 @@ def outbound(
     operator: str = Form(""),
     note: str = Form(""),
 ):
-    # 0️⃣ 브랜드 / 품명 자동 보정
-    try:
-        brand, resolved_item_name = resolve_inventory_brand_and_name(
-            warehouse=warehouse,
-            location=location,
-            item_code=item_code,
-            lot=lot,
-            spec=spec,
-            brand=brand,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if qty <= 0:
+        raise HTTPException(400, "출고 수량은 1 이상이어야 합니다.")
 
-    if not item_name:
-        item_name = resolved_item_name
-
-    # 1️⃣ 재고 차감
     ok = upsert_inventory(
         warehouse=warehouse,
-        location=location,
+        location=from_location,
         brand=brand,
         item_code=item_code,
         item_name=item_name,
@@ -50,9 +31,8 @@ def outbound(
         note=note or "출고",
     )
     if not ok:
-        raise HTTPException(status_code=400, detail="재고 부족")
+        raise HTTPException(400, "재고 부족")
 
-    # 2️⃣ 이력 기록
     add_history(
         type="출고",
         warehouse=warehouse,
@@ -62,7 +42,7 @@ def outbound(
         item_name=item_name,
         lot=lot,
         spec=spec,
-        from_location=location,
+        from_location=from_location,
         to_location="",
         qty=qty,
         note=note or "출고",
