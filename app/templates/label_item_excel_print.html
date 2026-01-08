@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+<style>
+@page {
+  size: {{ width_mm }}mm {{ height_mm }}mm;
+  margin: 0;
+}
+.label {
+  width: {{ width_mm }}mm;
+  height: {{ height_mm }}mm;
+  page-break-after: always;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3mm;
+}
+.code { font-weight: bold; font-size: 14px; }
+.name { font-size: 11px; margin: 1mm 0; }
+.meta { font-size: 10px; }
+.qr { align-self: center; margin-top: 2mm; }
+</style>
+</head>
+
+<body>
+{% set idx = 0 %}
+{% for item in items %}
+  {% for i in range(qty) %}
+    <div class="label">
+        <div class="code">{{ item.code }}</div>
+        <div class="name">{{ item.name }}</div>
+        <div class="meta">LOT {{ item.lot }}</div>
+        <div class="meta">{{ item.spec }}</div>
+        <div class="qr" id="qr-{{ idx }}"></div>
+    </div>
+    {% set idx = idx + 1 %}
+  {% endfor %}
+{% endfor %}
+
+<script>
+let idx = 0;
+{% for item in items %}
+  {% for i in range(qty) %}
+    new QRCode(
+      document.getElementById("qr-" + idx),
+      "type=ITEM&code={{ item.code }}&lot={{ item.lot }}&spec={{ item.spec }}"
+    );
+    idx++;
+  {% endfor %}
+{% endfor %}
+</script>
+
+</body>
+</html>
