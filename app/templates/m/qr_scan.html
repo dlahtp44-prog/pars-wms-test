@@ -17,9 +17,18 @@
 
     <form id="qrForm" method="post" action="{{ action or '/m/qr/submit' }}">
       <input id="qrtext" name="qrtext" type="hidden" value="">
+
+      {# 🔑 컨텍스트 유지 #}
+      {% if mode %}
+        <input type="hidden" name="mode" value="{{ mode }}">
+      {% endif %}
+      {% if warehouse %}
+        <input type="hidden" name="warehouse" value="{{ warehouse }}">
+      {% endif %}
+
       {% if hidden %}
         {% for k, v in hidden.items() %}
-          <input type="hidden" name="{{k}}" value="{{v}}">
+          <input type="hidden" name="{{ k }}" value="{{ v }}">
         {% endfor %}
       {% endif %}
     </form>
@@ -47,12 +56,16 @@
   let cameras = [];
   let camIndex = 0;
   let running = false;
+  let submitted = false;   // ✅ 중복 submit 방지
 
   const config = { fps: 10, qrbox: { width: 260, height: 260 } };
 
   function submitText(text){
+    if(submitted) return;
     const cleaned = (text || "").trim();
     if(!cleaned) return;
+
+    submitted = true;
     qrtextEl.value = cleaned;
     formEl.submit();
   }
@@ -65,13 +78,11 @@
   }
 
   async function startWithFacingMode(){
-    // iOS 대응: 후면 강제 (가능하면 exact)
     try{
       await qr.start({ facingMode: { exact: "environment" } }, config, submitText);
       running = true;
       return true;
     }catch(e){
-      // fallback: environment (not exact)
       try{
         await qr.start({ facingMode: "environment" }, config, submitText);
         running = true;
@@ -88,20 +99,18 @@
   }
 
   async function start(){
+    submitted = false;
     await stop();
 
-    // 1) facingMode 우선
     const ok = await startWithFacingMode();
     if(ok) return;
 
-    // 2) 카메라 목록 기반 fallback
     try{
       cameras = await Html5Qrcode.getCameras();
       if(!cameras || cameras.length === 0){
         alert("카메라를 찾을 수 없습니다.");
         return;
       }
-      // 후면 추정: label에 back/rear 있으면 우선, 없으면 마지막 카메라를 기본으로
       let idx = cameras.length - 1;
       for(let i=0;i<cameras.length;i++){
         const label = (cameras[i].label || "").toLowerCase();
@@ -125,6 +134,7 @@
       }
       camIndex = (camIndex + 1) % cameras.length;
       await stop();
+      submitted = false;
       await startWithDeviceId(cameras[camIndex].id);
     }catch(e){
       alert("카메라 전환 실패: " + e);
@@ -132,7 +142,6 @@
   });
 
   restartBtn.addEventListener("click", start);
-
   window.addEventListener("beforeunload", stop);
 
   start();
