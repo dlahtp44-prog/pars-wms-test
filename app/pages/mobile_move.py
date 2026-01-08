@@ -35,11 +35,25 @@ def _extract_location(raw: str) -> str:
     return raw
 
 
+# =====================================================
+# ENTRY POINT  ✅ 추가된 핵심
+# =====================================================
+@router.get("", response_class=HTMLResponse)
+def mobile_move_entry():
+    return RedirectResponse(url="/m/move/start", status_code=302)
+
+
+# =====================================================
+# STEP 1 : 출발 로케이션 스캔
+# =====================================================
 @router.get("/start", response_class=HTMLResponse)
 def start(request: Request):
     return templates.TemplateResponse("m/move_start.html", {"request": request})
 
 
+# =====================================================
+# STEP 2 : 출발 로케이션 재고 선택
+# =====================================================
 @router.get("/select", response_class=HTMLResponse)
 def select(request: Request, warehouse: str = "", from_location: str = ""):
     fl = _extract_location(from_location)
@@ -73,6 +87,9 @@ def select(request: Request, warehouse: str = "", from_location: str = ""):
     )
 
 
+# =====================================================
+# STEP 3 : 이동 처리
+# =====================================================
 @router.post("/do")
 def do_move(
     warehouse: str = Form(...),
@@ -97,7 +114,7 @@ def do_move(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다.")
 
-    # ✅ 브랜드/품명 자동 보정 (출발지 기준)
+    # 브랜드/품명 자동 보정
     try:
         resolved_brand, resolved_name = resolve_inventory_brand_and_name(
             warehouse=warehouse,
@@ -113,7 +130,7 @@ def do_move(
     final_brand = resolved_brand or brand
     final_name = item_name or resolved_name
 
-    # 1️⃣ 출발지 차감
+    # 출발지 차감
     ok = upsert_inventory(
         warehouse=warehouse,
         location=fl,
@@ -128,7 +145,7 @@ def do_move(
     if not ok:
         raise HTTPException(status_code=400, detail="재고 부족으로 이동할 수 없습니다.")
 
-    # 2️⃣ 도착지 가산
+    # 도착지 가산
     upsert_inventory(
         warehouse=warehouse,
         location=tl,
@@ -141,7 +158,7 @@ def do_move(
         note=note or "이동 도착",
     )
 
-    # 3️⃣ 이력 기록
+    # 이력
     add_history(
         type="이동",
         warehouse=warehouse,
@@ -160,6 +177,9 @@ def do_move(
     return RedirectResponse(url="/m/move/done", status_code=303)
 
 
+# =====================================================
+# STEP 4 : 완료
+# =====================================================
 @router.get("/done", response_class=HTMLResponse)
 def done(request: Request):
     return templates.TemplateResponse("m/move_done.html", {"request": request})
