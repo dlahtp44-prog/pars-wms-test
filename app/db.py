@@ -1,6 +1,6 @@
 # app/db.py
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -145,7 +145,7 @@ def init_db() -> None:
 
 
 # =====================================================
-# INVENTORY (INTERNAL CORE)
+# INVENTORY (CORE)
 # =====================================================
 
 def _upsert_inventory_with_conn(
@@ -252,7 +252,7 @@ def query_inventory(
 
 
 # =====================================================
-# BRAND / ITEM RESOLVE (MOVE / QR)
+# BRAND / ITEM RESOLVE
 # =====================================================
 
 def resolve_inventory_brand_and_name(
@@ -266,6 +266,7 @@ def resolve_inventory_brand_and_name(
     conn = get_db()
     try:
         cur = conn.cursor()
+
         if brand:
             cur.execute("""
             SELECT brand, item_name FROM inventory
@@ -286,10 +287,12 @@ def resolve_inventory_brand_and_name(
             _norm(item_code), _norm(lot), _norm(spec)
         ))
         rows = cur.fetchall()
+
         if len(rows) == 1:
             return rows[0]["brand"], rows[0]["item_name"]
         if len(rows) == 0:
             return "", ""
+
         brands = ", ".join(sorted({r["brand"] for r in rows}))
         raise ValueError(f"브랜드가 여러 개입니다: {brands}")
     finally:
@@ -297,7 +300,7 @@ def resolve_inventory_brand_and_name(
 
 
 # =====================================================
-# HISTORY
+# HISTORY (WRITE)
 # =====================================================
 
 def add_history(
@@ -330,6 +333,52 @@ def add_history(
             datetime.now().isoformat(timespec="seconds"),
         ))
         conn.commit()
+    finally:
+        conn.close()
+
+
+# =====================================================
+# HISTORY QUERY (🔥 누락되었던 핵심 함수)
+# =====================================================
+
+def query_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+                if day:
+                    pat += f"-{int(day):02d}"
+            where.append("created_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+        SELECT
+            h.*,
+            CASE
+                WHEN h.type='입고' THEN h.to_location
+                WHEN h.type='출고' THEN h.from_location
+                ELSE h.from_location
+            END AS location
+        FROM history h
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+
+        sql += " ORDER BY h.created_at DESC, h.id DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
 
