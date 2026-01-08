@@ -451,3 +451,68 @@ def add_damage_history(
         conn.commit()
     finally:
         conn.close()
+# =====================================================
+# DAMAGE HISTORY QUERY (페이지용)
+# =====================================================
+
+def query_damage_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+        SELECT
+            dh.*,
+            dc.category,
+            dc.type,
+            dc.situation
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+
+        sql += " ORDER BY dh.occurred_at DESC, dh.id DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def query_damage_summary_by_category(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+        SELECT
+            dc.category,
+            COUNT(*) AS cnt
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+        """
