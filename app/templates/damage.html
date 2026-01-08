@@ -12,9 +12,10 @@
     <h2>CS / 파손 등록</h2>
 
     <!--
-      ⚠️ 중요
-      - 발생일은 서버에서 기본값만 내려주고
-      - HTML에서는 readonly / disabled 절대 사용하지 않음
+      UX 정책
+      - 발생일: 서버에서 오늘 날짜 기본값 제공
+      - 사용자는 자유롭게 수정 가능
+      - readonly / disabled 절대 사용하지 않음
     -->
     <form method="post" action="/damage" class="grid">
 
@@ -34,9 +35,9 @@
           <input
             type="number"
             step="0.001"
+            min="0.001"
             name="qty"
             value="1"
-            min="0.001"
             required
           >
         </div>
