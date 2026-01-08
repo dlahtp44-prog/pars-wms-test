@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>로케이션 라벨 출력</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- QR 생성 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+    <style>
+        @page {
+            size: {{ width_mm }}mm {{ height_mm }}mm;
+            margin: 0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .label {
+            width: {{ width_mm }}mm;
+            height: {{ height_mm }}mm;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            page-break-after: always;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .location-text {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 4mm;
+            text-align: center;
+        }
+
+        .qr {
+            width: 22mm;
+            height: 22mm;
+        }
+
+        /* 마지막 페이지 여백 제거 */
+        .label:last-child {
+            page-break-after: auto;
+        }
+
+        @media screen {
+            body {
+                background: #eee;
+            }
+            .label {
+                margin: 8px auto;
+                background: white;
+                box-shadow: 0 0 6px rgba(0,0,0,0.2);
+            }
+        }
+    </style>
+</head>
+<body>
+
+{% for i in range(qty) %}
+<div class="label">
+    <div class="location-text">{{ location }}</div>
+    <div class="qr" id="qr-{{ i }}"></div>
+</div>
+{% endfor %}
+
+<script>
+    const qrValue = "{{ qr_value }}";
+
+    {% for i in range(qty) %}
+    new QRCode(document.getElementById("qr-{{ i }}"), {
+        text: qrValue,
+        width: 100,
+        height: 100,
+        correctLevel: QRCode.CorrectLevel.M
+    });
+    {% endfor %}
+
+    // 자동 인쇄 (원하면 주석 해제)
+    // window.onload = () => window.print();
+</script>
+
+</body>
+</html>
