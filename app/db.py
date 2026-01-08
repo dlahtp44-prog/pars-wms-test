@@ -125,7 +125,7 @@ def init_db() -> None:
         )
         """)
 
-        # SEED DAMAGE CODES (1회)
+        # SEED DAMAGE CODES
         cur.execute("SELECT COUNT(*) FROM damage_codes")
         if cur.fetchone()[0] == 0:
             cur.executemany("""
@@ -160,6 +160,11 @@ def _upsert_inventory_with_conn(
     qty_delta: float,
     note: str = "",
 ) -> bool:
+    """
+    ✅ 정책
+    - qty 변경 시 note 절대 수정하지 않음
+    - note는 '신규 입고 INSERT'에서만 사용
+    """
     cur = conn.cursor()
     now = datetime.now().isoformat(timespec="seconds")
     delta = _q3(qty_delta)
@@ -178,18 +183,23 @@ def _upsert_inventory_with_conn(
         current = float(row["qty"])
         if delta < 0 and current < abs(delta):
             return False
+
         new_qty = _q3(current + delta)
+
         if new_qty <= 0:
             cur.execute("DELETE FROM inventory WHERE id=?", (row["id"],))
         else:
+            # 🔥 note 미수정
             cur.execute("""
                 UPDATE inventory
-                SET qty=?, note=?, updated_at=?
+                SET qty=?, updated_at=?
                 WHERE id=?
-            """, (new_qty, _norm(note), now, row["id"]))
+            """, (new_qty, now, row["id"]))
     else:
         if delta <= 0:
             return False
+
+        # 신규 입고만 note 허용
         cur.execute("""
             INSERT INTO inventory
             (warehouse, location, brand, item_code, item_name, lot, spec, qty, note, updated_at)
@@ -252,93 +262,7 @@ def query_inventory(
 
 
 # =====================================================
-# BRAND / ITEM RESOLVE
-# =====================================================
-
-def resolve_inventory_brand_and_name(
-    warehouse: str,
-    location: str,
-    item_code: str,
-    lot: str,
-    spec: str,
-    brand: str = "",
-) -> Tuple[str, str]:
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-
-        if brand:
-            cur.execute("""
-            SELECT brand, item_name FROM inventory
-            WHERE warehouse=? AND location=? AND brand=? AND item_code=? AND lot=? AND spec=?
-            ORDER BY updated_at DESC LIMIT 1
-            """, (
-                _norm(warehouse), _norm(location), _norm(brand),
-                _norm(item_code), _norm(lot), _norm(spec)
-            ))
-            r = cur.fetchone()
-            return (r["brand"], r["item_name"]) if r else (brand, "")
-
-        cur.execute("""
-        SELECT DISTINCT brand, item_name FROM inventory
-        WHERE warehouse=? AND location=? AND item_code=? AND lot=? AND spec=? AND qty > 0
-        """, (
-            _norm(warehouse), _norm(location),
-            _norm(item_code), _norm(lot), _norm(spec)
-        ))
-        rows = cur.fetchall()
-
-        if len(rows) == 1:
-            return rows[0]["brand"], rows[0]["item_name"]
-        if len(rows) == 0:
-            return "", ""
-
-        brands = ", ".join(sorted({r["brand"] for r in rows}))
-        raise ValueError(f"브랜드가 여러 개입니다: {brands}")
-    finally:
-        conn.close()
-
-
-# =====================================================
-# HISTORY (WRITE)
-# =====================================================
-
-def add_history(
-    type: str,
-    warehouse: str,
-    operator: str,
-    brand: str,
-    item_code: str,
-    item_name: str,
-    lot: str,
-    spec: str,
-    from_location: str,
-    to_location: str,
-    qty: float,
-    note: str = "",
-):
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-        INSERT INTO history
-        (type, warehouse, operator, brand, item_code, item_name,
-         lot, spec, from_location, to_location, qty, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            _norm(type), _norm(warehouse), _norm(operator), _norm(brand),
-            _norm(item_code), _norm(item_name), _norm(lot), _norm(spec),
-            _norm(from_location), _norm(to_location),
-            _q3(qty), _norm(note),
-            datetime.now().isoformat(timespec="seconds"),
-        ))
-        conn.commit()
-    finally:
-        conn.close()
-
-
-# =====================================================
-# HISTORY QUERY (🔥 누락되었던 핵심 함수)
+# HISTORY QUERY
 # =====================================================
 
 def query_history(
@@ -376,141 +300,6 @@ def query_history(
 
         sql += " ORDER BY h.created_at DESC, h.id DESC LIMIT ?"
         params.append(int(limit))
-
-        cur.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
-
-
-# =====================================================
-# DAMAGE / CS
-# =====================================================
-
-def list_damage_codes(active_only: bool = True) -> List[Dict[str, Any]]:
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        sql = "SELECT * FROM damage_codes"
-        if active_only:
-            sql += " WHERE is_active=1"
-        sql += " ORDER BY category, type, situation"
-        cur.execute(sql)
-        return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
-
-
-def add_damage_history(
-    occurred_at: str,
-    warehouse: str,
-    location: str,
-    brand: str,
-    item_code: str,
-    item_name: str,
-    lot: str,
-    spec: str,
-    qty: float,
-    damage_code_id: int,
-    detail: str = "",
-    deduct_inventory: bool = False,
-):
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        now = datetime.now().isoformat(timespec="seconds")
-        q = _q3(qty)
-
-        cur.execute("""
-        INSERT INTO damage_history (
-            occurred_at, warehouse, location, brand,
-            item_code, item_name, lot, spec,
-            qty, damage_code_id, detail, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            _norm(occurred_at), _norm(warehouse), _norm(location), _norm(brand),
-            _norm(item_code), _norm(item_name), _norm(lot), _norm(spec),
-            q, int(damage_code_id), _norm(detail), now
-        ))
-
-        if deduct_inventory:
-            ok = _upsert_inventory_with_conn(
-                conn,
-                warehouse=warehouse,
-                location=location,
-                brand=brand,
-                item_code=item_code,
-                item_name=item_name,
-                lot=lot,
-                spec=spec,
-                qty_delta=-q,
-                note="CS 차감",
-            )
-            if not ok:
-                raise ValueError("재고 부족")
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def query_damage_history(
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    limit: int = 500,
-) -> List[Dict[str, Any]]:
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        where, params = [], []
-
-        if year:
-            pat = f"{int(year):04d}"
-            if month:
-                pat += f"-{int(month):02d}"
-            where.append("dh.occurred_at LIKE ?")
-            params.append(f"{pat}%")
-
-        sql = """
-        SELECT dh.*, dc.category, dc.type, dc.situation
-        FROM damage_history dh
-        JOIN damage_codes dc ON dh.damage_code_id = dc.id
-        """
-        if where:
-            sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY dh.occurred_at DESC, dh.id DESC LIMIT ?"
-        params.append(int(limit))
-
-        cur.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
-
-
-def query_damage_summary_by_category(
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        where, params = [], []
-
-        if year:
-            pat = f"{int(year):04d}"
-            if month:
-                pat += f"-{int(month):02d}"
-            where.append("dh.occurred_at LIKE ?")
-            params.append(f"{pat}%")
-
-        sql = """
-        SELECT dc.category, COUNT(*) AS cnt
-        FROM damage_history dh
-        JOIN damage_codes dc ON dh.damage_code_id = dc.id
-        """
-        if where:
-            sql += " WHERE " + " AND ".join(where)
-        sql += " GROUP BY dc.category ORDER BY cnt DESC"
 
         cur.execute(sql, params)
         return [dict(r) for r in cur.fetchall()]
