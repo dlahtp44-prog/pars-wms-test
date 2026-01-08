@@ -13,6 +13,7 @@ app = FastAPI(
     version="1.6.6-qr"
 )
 
+
 @app.on_event("startup")
 def on_startup():
     """
@@ -48,7 +49,7 @@ from app.pages.excel_inbound import router as excel_inbound_page_router
 from app.pages.excel_outbound import router as excel_outbound_page_router
 from app.pages.damage import router as damage_page_router
 from app.pages.damage_history import router as damage_history_page_router
-
+from app.pages.label import router as label_page_router  # ✅ 라벨 페이지 추가
 
 app.include_router(index_router)
 app.include_router(inbound_page_router)
@@ -61,6 +62,7 @@ app.include_router(excel_inbound_page_router)
 app.include_router(excel_outbound_page_router)
 app.include_router(damage_page_router)
 app.include_router(damage_history_page_router)
+app.include_router(label_page_router)  # ✅ 라벨 페이지 등록
 
 
 # =====================================================
@@ -73,12 +75,14 @@ from app.pages.mobile_qr_inventory import router as mobile_qr_inventory_router
 from app.pages.mobile_inventory_detail import router as mobile_inventory_detail_router
 from app.pages.mobile_move import router as mobile_move_router
 from app.pages.mobile_cs import router as mobile_cs_router
+
 app.include_router(mobile_home_router)
 app.include_router(mobile_qr_router)
 app.include_router(mobile_qr_inventory_router)
 app.include_router(mobile_inventory_detail_router)
 app.include_router(mobile_move_router)
 app.include_router(mobile_cs_router)
+
 
 # =====================================================
 # API ROUTERS
