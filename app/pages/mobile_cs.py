@@ -5,7 +5,7 @@ from datetime import date
 
 from app.core.paths import TEMPLATES_DIR
 from app.db import list_damage_codes
-from app.utils.qr_format import extract_item_fields
+from app.utils.qr_format import is_item_qr, extract_item_fields
 
 router = APIRouter(prefix="/m/cs", tags=["mobile-cs"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -18,19 +18,28 @@ def mobile_cs_page(
     warehouse: str = "",
     location: str = "",
 ):
-    # QR → 품목 정보 추출
-    item_code, item_name, lot, spec, brand = ("", "", "", "", "")
-    if qr:
-        item_code, item_name, lot, spec, brand = extract_item_fields(qr)
+    # 기본값
+    item_code = ""
+    item_name = ""
+    lot = ""
+    spec = ""
+    brand = ""
+
+    # ✅ ITEM QR일 때만 파싱
+    if qr and is_item_qr(qr):
+        try:
+            item_code, item_name, lot, spec = extract_item_fields(qr)
+        except Exception:
+            # 잘못된 QR → 품목 정보 없이 CS 화면 진입
+            pass
 
     damage_codes = list_damage_codes(active_only=True)
-
-    request.state.today = date.today().isoformat()
 
     return templates.TemplateResponse(
         "mobile_cs.html",
         {
             "request": request,
+            "today": date.today().isoformat(),
             "warehouse": warehouse,
             "location": location,
             "brand": brand,
