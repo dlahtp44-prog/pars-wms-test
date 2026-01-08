@@ -220,13 +220,10 @@ def upsert_inventory(
     conn.close()
 
 
-def query_inventory(
-    warehouse: str = "",
-    location: str = "",
-    brand: str = "",
-    item_code: str = "",
-    lot: str = "",
-    spec: str = "",
+def query_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
     limit: int = 500,
 ) -> List[Dict[str, Any]]:
     conn = get_db()
@@ -235,36 +232,26 @@ def query_inventory(
     where = []
     params: List[Any] = []
 
-    warehouse = _norm(warehouse)
-    location = _norm(location)
-    brand = _norm(brand)
-    item_code = _norm(item_code)
-    lot = _norm(lot)
-    spec = _norm(spec)
+    # created_at 예: 2026-01-08T14:32:10
+    if year:
+        y = f"{int(year):04d}"
+        if month:
+            m = f"{int(month):02d}"
+            if day:
+                d = f"{int(day):02d}"
+                where.append("created_at LIKE ?")
+                params.append(f"{y}-{m}-{d}%")
+            else:
+                where.append("created_at LIKE ?")
+                params.append(f"{y}-{m}%")
+        else:
+            where.append("created_at LIKE ?")
+            params.append(f"{y}%")
 
-    if warehouse:
-        where.append("warehouse=?")
-        params.append(warehouse)
-    if location:
-        where.append("location LIKE ?")
-        params.append(f"%{location}%")
-    if brand:
-        where.append("brand=?")
-        params.append(brand)
-    if item_code:
-        where.append("item_code LIKE ?")
-        params.append(f"%{item_code}%")
-    if lot:
-        where.append("lot LIKE ?")
-        params.append(f"%{lot}%")
-    if spec:
-        where.append("spec LIKE ?")
-        params.append(f"%{spec}%")
-
-    sql = "SELECT * FROM inventory"
+    sql = "SELECT * FROM history"
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY updated_at DESC LIMIT ?"
+    sql += " ORDER BY created_at DESC LIMIT ?"
     params.append(limit)
 
     cur.execute(sql, params)
