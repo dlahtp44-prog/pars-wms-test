@@ -27,10 +27,10 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 # =====================================================
-# 로케이션 엑셀 업로드 → 라벨 출력
+# LOCATION (로케이션) 엑셀 업로드 → 라벨 출력
 # =====================================================
 
-@router.get("/로케이션/excel", response_class=HTMLResponse)
+@router.get("/location/excel", response_class=HTMLResponse)
 def label_location_excel_form(request: Request):
     return templates.TemplateResponse(
         "label_location_excel_form.html",
@@ -38,7 +38,7 @@ def label_location_excel_form(request: Request):
     )
 
 
-@router.post("/로케이션/excel/preview", response_class=HTMLResponse)
+@router.post("/location/excel/preview", response_class=HTMLResponse)
 async def label_location_excel_preview(
     request: Request,
     file: UploadFile = File(...),
@@ -48,6 +48,7 @@ async def label_location_excel_preview(
     content = await file.read()
     df = pd.read_excel(io.BytesIO(content))
 
+    # 컬럼명 정규화
     df.columns = [c.lower().strip() for c in df.columns]
 
     if "location" not in df.columns:
@@ -75,7 +76,7 @@ async def label_location_excel_preview(
     )
 
 
-@router.post("/로케이션/excel/print", response_class=HTMLResponse)
+@router.post("/location/excel/print", response_class=HTMLResponse)
 def label_location_excel_print(
     request: Request,
     locations: list[str] = Form(...),
@@ -100,10 +101,10 @@ def label_location_excel_print(
 
 
 # =====================================================
-# 제품 엑셀 업로드 → 라벨 출력
+# ITEM (제품) 엑셀 업로드 → 라벨 출력
 # =====================================================
 
-@router.get("/제품/excel", response_class=HTMLResponse)
+@router.get("/item/excel", response_class=HTMLResponse)
 def label_item_excel_form(request: Request):
     return templates.TemplateResponse(
         "label_item_excel_form.html",
@@ -111,7 +112,7 @@ def label_item_excel_form(request: Request):
     )
 
 
-@router.post("/제품/excel/preview", response_class=HTMLResponse)
+@router.post("/item/excel/preview", response_class=HTMLResponse)
 async def label_item_excel_preview(
     request: Request,
     file: UploadFile = File(...),
@@ -121,6 +122,7 @@ async def label_item_excel_preview(
     content = await file.read()
     df = pd.read_excel(io.BytesIO(content))
 
+    # 컬럼명 정규화
     df.columns = [c.lower().strip() for c in df.columns]
 
     required = {"code", "name", "lot", "spec"}
@@ -148,7 +150,7 @@ async def label_item_excel_preview(
     )
 
 
-@router.post("/제품/excel/print", response_class=HTMLResponse)
+@router.post("/item/excel/print", response_class=HTMLResponse)
 def label_item_excel_print(
     request: Request,
     codes: list[str] = Form(...),
