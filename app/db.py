@@ -7,14 +7,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.core.paths import DB_PATH
 
 # =====================================================
-# DB CONNECTION (🔥 핵심 수정)
+# DB CONNECTION
 # =====================================================
 
 def get_db() -> sqlite3.Connection:
     """
     SQLite 안전 연결
-    - timeout / busy_timeout 필수
-    - check_same_thread=False (FastAPI 멀티스레드 대응)
+    - FastAPI 멀티스레드 대응
+    - DB lock 방지
     """
     conn = sqlite3.connect(
         str(DB_PATH),
@@ -31,16 +31,16 @@ def get_db() -> sqlite3.Connection:
 # UTILS
 # =====================================================
 
-def _q3(val) -> float:
-    if val is None:
-        return 0.0
-    return float(
-        Decimal(str(val)).quantize(Decimal("0.000"), rounding=ROUND_HALF_UP)
-    )
-
-
 def _norm(v: Optional[str]) -> str:
     return (v or "").strip()
+
+
+def _q3(v) -> float:
+    if v is None:
+        return 0.0
+    return float(
+        Decimal(str(v)).quantize(Decimal("0.000"), rounding=ROUND_HALF_UP)
+    )
 
 
 # =====================================================
@@ -52,7 +52,7 @@ def init_db() -> None:
     try:
         cur = conn.cursor()
 
-        # inventory
+        # INVENTORY
         cur.execute("""
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +73,7 @@ def init_db() -> None:
         ON inventory (warehouse, location, brand, item_code, lot, spec)
         """)
 
-        # history
+        # HISTORY
         cur.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,7 +93,7 @@ def init_db() -> None:
         )
         """)
 
-        # damage codes
+        # DAMAGE CODES
         cur.execute("""
         CREATE TABLE IF NOT EXISTS damage_codes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +105,7 @@ def init_db() -> None:
         )
         """)
 
-        # damage history
+        # DAMAGE HISTORY
         cur.execute("""
         CREATE TABLE IF NOT EXISTS damage_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,7 +125,7 @@ def init_db() -> None:
         )
         """)
 
-        # seed damage codes
+        # SEED DAMAGE CODES (1회)
         cur.execute("SELECT COUNT(*) FROM damage_codes")
         if cur.fetchone()[0] == 0:
             cur.executemany("""
@@ -145,7 +145,7 @@ def init_db() -> None:
 
 
 # =====================================================
-# INVENTORY (공통 내부 함수)
+# INVENTORY (INTERNAL CORE)
 # =====================================================
 
 def _upsert_inventory_with_conn(
@@ -211,6 +211,92 @@ def upsert_inventory(**kwargs) -> bool:
 
 
 # =====================================================
+# INVENTORY QUERY
+# =====================================================
+
+def query_inventory(
+    warehouse: Optional[str] = None,
+    location: Optional[str] = None,
+    brand: Optional[str] = None,
+    item_code: Optional[str] = None,
+    lot: Optional[str] = None,
+    spec: Optional[str] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = ["qty > 0"], []
+
+        if warehouse:
+            where.append("warehouse=?"); params.append(_norm(warehouse))
+        if location:
+            where.append("location LIKE ?"); params.append(f"%{_norm(location)}%")
+        if brand:
+            where.append("brand=?"); params.append(_norm(brand))
+        if item_code:
+            where.append("item_code LIKE ?"); params.append(f"%{_norm(item_code)}%")
+        if lot:
+            where.append("lot LIKE ?"); params.append(f"%{_norm(lot)}%")
+        if spec:
+            where.append("spec LIKE ?"); params.append(f"%{_norm(spec)}%")
+
+        sql = "SELECT * FROM inventory WHERE " + " AND ".join(where)
+        sql += " ORDER BY updated_at DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+# =====================================================
+# BRAND / ITEM RESOLVE (MOVE / QR)
+# =====================================================
+
+def resolve_inventory_brand_and_name(
+    warehouse: str,
+    location: str,
+    item_code: str,
+    lot: str,
+    spec: str,
+    brand: str = "",
+) -> Tuple[str, str]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        if brand:
+            cur.execute("""
+            SELECT brand, item_name FROM inventory
+            WHERE warehouse=? AND location=? AND brand=? AND item_code=? AND lot=? AND spec=?
+            ORDER BY updated_at DESC LIMIT 1
+            """, (
+                _norm(warehouse), _norm(location), _norm(brand),
+                _norm(item_code), _norm(lot), _norm(spec)
+            ))
+            r = cur.fetchone()
+            return (r["brand"], r["item_name"]) if r else (brand, "")
+
+        cur.execute("""
+        SELECT DISTINCT brand, item_name FROM inventory
+        WHERE warehouse=? AND location=? AND item_code=? AND lot=? AND spec=? AND qty > 0
+        """, (
+            _norm(warehouse), _norm(location),
+            _norm(item_code), _norm(lot), _norm(spec)
+        ))
+        rows = cur.fetchall()
+        if len(rows) == 1:
+            return rows[0]["brand"], rows[0]["item_name"]
+        if len(rows) == 0:
+            return "", ""
+        brands = ", ".join(sorted({r["brand"] for r in rows}))
+        raise ValueError(f"브랜드가 여러 개입니다: {brands}")
+    finally:
+        conn.close()
+
+
+# =====================================================
 # HISTORY
 # =====================================================
 
@@ -249,7 +335,7 @@ def add_history(
 
 
 # =====================================================
-# DAMAGE / CS (🔥 완전 수정)
+# DAMAGE / CS
 # =====================================================
 
 def list_damage_codes(active_only: bool = True) -> List[Dict[str, Any]]:
@@ -286,7 +372,6 @@ def add_damage_history(
         now = datetime.now().isoformat(timespec="seconds")
         q = _q3(qty)
 
-        # 🔒 하나의 트랜잭션
         cur.execute("""
         INSERT INTO damage_history (
             occurred_at, warehouse, location, brand,
@@ -316,5 +401,69 @@ def add_damage_history(
                 raise ValueError("재고 부족")
 
         conn.commit()
+    finally:
+        conn.close()
+
+
+def query_damage_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+        SELECT dh.*, dc.category, dc.type, dc.situation
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY dh.occurred_at DESC, dh.id DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def query_damage_summary_by_category(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+        SELECT dc.category, COUNT(*) AS cnt
+        FROM damage_history dh
+        JOIN damage_codes dc ON dh.damage_code_id = dc.id
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " GROUP BY dc.category ORDER BY cnt DESC"
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
