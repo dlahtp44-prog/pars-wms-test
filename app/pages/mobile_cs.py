@@ -1,52 +1,70 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import date
 
 from app.core.paths import TEMPLATES_DIR
-from app.db import list_damage_codes
-from app.utils.qr_format import is_item_qr, extract_item_fields
+from app.db import add_damage_history, list_damage_codes
 
 router = APIRouter(prefix="/m/cs", tags=["mobile-cs"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 @router.get("", response_class=HTMLResponse)
-def mobile_cs_page(
-    request: Request,
-    qr: str = "",          # QR 스캔 결과
-    warehouse: str = "",
-    location: str = "",
-):
-    # 기본값
-    item_code = ""
-    item_name = ""
-    lot = ""
-    spec = ""
-    brand = ""
-
-    # ✅ ITEM QR일 때만 파싱
-    if qr and is_item_qr(qr):
-        try:
-            item_code, item_name, lot, spec = extract_item_fields(qr)
-        except Exception:
-            # 잘못된 QR → 품목 정보 없이 CS 화면 진입
-            pass
-
-    damage_codes = list_damage_codes(active_only=True)
-
+def cs_page(request: Request, msg: str = ""):
     return templates.TemplateResponse(
         "mobile_cs.html",
         {
             "request": request,
+            "damage_codes": list_damage_codes(active_only=True),
             "today": date.today().isoformat(),
-            "warehouse": warehouse,
-            "location": location,
-            "brand": brand,
-            "item_code": item_code,
-            "item_name": item_name,
-            "lot": lot,
-            "spec": spec,
-            "damage_codes": damage_codes,
+            "msg": msg,
         },
+    )
+
+
+@router.post("")
+def submit_cs(
+    occurred_at: str = Form(...),
+    warehouse: str = Form(...),
+    location: str = Form(...),
+    brand: str = Form(""),
+    item_code: str = Form(...),
+    item_name: str = Form(...),
+    lot: str = Form(...),
+    spec: str = Form(...),
+    qty: float = Form(...),
+    damage_code_id: int = Form(...),
+    detail: str = Form(""),
+):
+    if qty <= 0:
+        return RedirectResponse(
+            url="/m/cs?msg=수량은_1_이상이어야_합니다",
+            status_code=303,
+        )
+
+    try:
+        add_damage_history(
+            occurred_at=occurred_at,
+            warehouse=warehouse,
+            location=location,
+            brand=brand,
+            item_code=item_code,
+            item_name=item_name,
+            lot=lot,
+            spec=spec,
+            qty=qty,
+            damage_code_id=damage_code_id,
+            detail=detail,
+            deduct_inventory=True,
+        )
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/m/cs?msg={str(e)}",
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url="/m/cs?msg=CS_등록_완료",
+        status_code=303,
     )
