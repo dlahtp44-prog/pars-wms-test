@@ -1,0 +1,29 @@
+from fastapi import Form
+from fastapi.responses import HTMLResponse
+
+@router.post("/로케이션/print", response_class=HTMLResponse)
+def label_location_print(
+    request: Request,
+    location: str = Form(...),
+    size: str = Form(...),
+    qty: int = Form(...),
+):
+    # size 파싱 (예: 70x40)
+    try:
+        width_mm, height_mm = map(int, size.split("x"))
+    except Exception:
+        width_mm, height_mm = 70, 40
+
+    qr_value = f"type=LOC&location={location}"
+
+    return templates.TemplateResponse(
+        "label_location_print.html",
+        {
+            "request": request,
+            "location": location,
+            "qr_value": qr_value,
+            "qty": qty,
+            "width_mm": width_mm,
+            "height_mm": height_mm,
+        },
+    )
