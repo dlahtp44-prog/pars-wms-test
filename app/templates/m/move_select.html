@@ -71,7 +71,7 @@
                 <td>{{ r.item_name }}</td>
                 <td>{{ r.lot }}</td>
                 <td>{{ r.spec }}</td>
-                <td style="text-align:right;">{{ r.qty }}</td>
+                <td class="qty-cell" style="text-align:right;">{{ r.qty }}</td>
 
                 <input type="hidden" data-idx="{{ loop.index0 }}" data-k="brand" value="{{ r.brand }}">
                 <input type="hidden" data-idx="{{ loop.index0 }}" data-k="item_code" value="{{ r.item_code }}">
@@ -95,7 +95,6 @@
           </div>
         </div>
 
-        <!-- 선택된 품목 정보가 서버로 가도록 hidden 생성 -->
         <input type="hidden" name="brand" id="brand_h">
         <input type="hidden" name="item_code" id="item_code_h">
         <input type="hidden" name="item_name" id="item_name_h">
@@ -115,10 +114,7 @@
 function extractLocation(raw){
   raw = (raw||'').trim();
   if(raw.includes('location=')){
-    try{
-      const q = raw.split('location=')[1];
-      raw = q.split('&')[0];
-    }catch(e){}
+    try{ raw = raw.split('location=')[1].split('&')[0]; }catch(e){}
   }
   if(raw.includes('type=') || raw.includes('item_code=') || raw.includes('&') || raw.includes('=')) return '';
   if(raw.length>60) return '';
@@ -132,32 +128,46 @@ qr.start(
   { fps: 10, qrbox: 220 },
   (decodedText)=>{
     const loc = extractLocation(decodedText);
-    if(!loc) return;
-    document.getElementById('to_location').value = loc;
+    if(loc) document.getElementById('to_location').value = loc;
   },
   ()=>{}
 ).catch(()=>{});
 
+window.addEventListener("beforeunload", ()=>{
+  try{ qr.stop(); }catch(e){}
+});
+
 document.getElementById('moveForm').addEventListener('submit', (e)=>{
   const toLoc = extractLocation(document.getElementById('to_location').value);
   if(!toLoc){
-    e.preventDefault();
-    alert('도착 로케이션을 입력/스캔하세요. (로케이션 QR만 허용)');
-    return;
+    e.preventDefault(); alert('도착 로케이션을 입력/스캔하세요.'); return;
   }
   document.getElementById('to_location_hidden').value = toLoc;
+
+  document.querySelector('input[name="warehouse"]').value =
+    (document.getElementById('warehouse').value||'').trim();
 
   const op = (document.getElementById('operator').value||'').trim();
   document.getElementById('operator_hidden').value = op;
 
   const pick = document.querySelector('input[name="pick"]:checked');
-  if(!pick){
-    e.preventDefault(); alert('이동할 품목을 선택하세요.'); return;
-  }
+  if(!pick){ e.preventDefault(); alert('이동할 품목을 선택하세요.'); return; }
+
   const idx = pick.value;
   function get(k){
-    return document.querySelector(`input[type="hidden"][data-idx="${idx}"][data-k="${k}"]`).value;
+    return document.querySelector(`input[data-idx="${idx}"][data-k="${k}"]`).value;
   }
+
+  const maxQty = parseFloat(
+    document.querySelectorAll('.qty-cell')[idx].innerText
+  );
+  const inputQty = parseFloat(document.querySelector('input[name="qty"]').value);
+  if(inputQty > maxQty){
+    e.preventDefault();
+    alert(`이동 수량이 재고(${maxQty})를 초과합니다.`);
+    return;
+  }
+
   document.getElementById('brand_h').value = get('brand');
   document.getElementById('item_code_h').value = get('item_code');
   document.getElementById('item_name_h').value = get('item_name');
