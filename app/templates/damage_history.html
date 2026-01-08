@@ -11,28 +11,49 @@
   <div class="card">
     <h2>파손 이력</h2>
 
-    <form method="get" action="/damage/history" class="grid">
+    <!-- 검색 조건 -->
+    <form method="get" action="/damage/history" class="grid" autocomplete="off">
       <div class="grid-3">
         <div>
-          <label>년(YYYY)</label>
-          <input name="year" value="{{ year or '' }}" placeholder="예: 2026">
+          <label>년 (YYYY)</label>
+          <input
+            type="number"
+            name="year"
+            value="{{ year or '' }}"
+            placeholder="예: 2026"
+          >
         </div>
         <div>
-          <label>월(MM)</label>
-          <input name="month" value="{{ month or '' }}" placeholder="예: 1">
+          <label>월 (MM)</label>
+          <input
+            type="number"
+            name="month"
+            value="{{ month or '' }}"
+            placeholder="예: 1"
+            min="1"
+            max="12"
+          >
         </div>
         <div>
-          <label>표시개수(limit)</label>
-          <input name="limit" value="{{ limit }}" placeholder="500">
+          <label>표시 개수</label>
+          <input
+            type="number"
+            name="limit"
+            value="{{ limit or 500 }}"
+            placeholder="500"
+            min="10"
+          >
         </div>
       </div>
+
       <div class="actions">
         <button class="btn" type="submit">검색</button>
-        <a class="btn ghost" href="/damage">등록</a>
+        <a class="btn ghost" href="/damage">파손 등록</a>
         <a class="btn ghost" href="/">메인</a>
       </div>
     </form>
 
+    <!-- 파손 이력 테이블 -->
     <div class="table-wrap">
       <table>
         <thead>
@@ -45,42 +66,68 @@
             <th>품명</th>
             <th>LOT</th>
             <th>규격</th>
-            <th>수량</th>
-            <th>유형</th>
-            <th>상세</th>
+            <th style="text-align:right;">수량</th>
+            <th>파손 유형</th>
+            <th>상세 내용</th>
           </tr>
         </thead>
         <tbody>
-          {% for r in rows %}
-          <tr>
-            <td>{{ r.occurred_at }}</td>
-            <td>{{ r.warehouse }}</td>
-            <td>{{ r.location }}</td>
-            <td>{{ r.brand }}</td>
-            <td>{{ r.item_code }}</td>
-            <td>{{ r.item_name }}</td>
-            <td>{{ r.lot }}</td>
-            <td>{{ r.spec }}</td>
-            <td style="text-align:right;">{{ r.qty }}</td>
-            <td>{{ r.category }} / {{ r.type }} / {{ r.situation }}</td>
-            <td>{{ r.detail }}</td>
-          </tr>
-          {% endfor %}
+          {% if rows %}
+            {% for r in rows %}
+            <tr>
+              <td>{{ r.occurred_at }}</td>
+              <td>{{ r.warehouse }}</td>
+              <td>{{ r.location }}</td>
+              <td>{{ r.brand }}</td>
+              <td>{{ r.item_code }}</td>
+              <td>{{ r.item_name }}</td>
+              <td>{{ r.lot }}</td>
+              <td>{{ r.spec }}</td>
+              <td style="text-align:right;">{{ r.qty }}</td>
+              <td>{{ r.category }} / {{ r.type }} / {{ r.situation }}</td>
+              <td>{{ r.detail }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="11" style="text-align:center;opacity:0.6;">
+                조회된 파손 이력이 없습니다.
+              </td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
 
-    <h3 style="margin-top:18px;">카테고리 요약</h3>
+    <!-- 요약 -->
+    <h3 style="margin-top:20px;">카테고리별 요약</h3>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>카테고리</th><th>건수</th></tr></thead>
+        <thead>
+          <tr>
+            <th>카테고리</th>
+            <th style="text-align:right;">건수</th>
+          </tr>
+        </thead>
         <tbody>
-          {% for s in summary %}
-          <tr><td>{{ s.category }}</td><td style="text-align:right;">{{ s.cnt }}</td></tr>
-          {% endfor %}
+          {% if summary %}
+            {% for s in summary %}
+            <tr>
+              <td>{{ s.category }}</td>
+              <td style="text-align:right;">{{ s.cnt }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="2" style="text-align:center;opacity:0.6;">
+                요약 데이터가 없습니다.
+              </td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
+
   </div>
 </div>
 </body>
