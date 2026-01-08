@@ -276,6 +276,66 @@ def query_inventory(
     finally:
         conn.close()
 
+# =====================================================
+# BRAND / ITEM RESOLVE (이동 / 출고용)
+# =====================================================
+
+def resolve_inventory_brand_and_name(
+    warehouse: str,
+    location: str,
+    item_code: str,
+    lot: str,
+    spec: str,
+    brand: str = "",
+) -> Tuple[str, str]:
+    """
+    이동 / 출고 시
+    - 브랜드가 없으면 inventory 기준으로 자동 보정
+    - 단일 결과만 허용
+    """
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+
+        # 브랜드가 이미 들어온 경우 → 그대로 사용
+        if brand:
+            cur.execute("""
+            SELECT brand, item_name
+            FROM inventory
+            WHERE warehouse=? AND location=? AND brand=? 
+              AND item_code=? AND lot=? AND spec=?
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """, (
+                _norm(warehouse), _norm(location), _norm(brand),
+                _norm(item_code), _norm(lot), _norm(spec)
+            ))
+            r = cur.fetchone()
+            return (r["brand"], r["item_name"]) if r else (brand, "")
+
+        # 브랜드 미지정 → inventory 기준 탐색
+        cur.execute("""
+        SELECT DISTINCT brand, item_name
+        FROM inventory
+        WHERE warehouse=? AND location=? 
+          AND item_code=? AND lot=? AND spec=? AND qty > 0
+        """, (
+            _norm(warehouse), _norm(location),
+            _norm(item_code), _norm(lot), _norm(spec)
+        ))
+        rows = cur.fetchall()
+
+        if len(rows) == 1:
+            return rows[0]["brand"], rows[0]["item_name"]
+
+        if len(rows) == 0:
+            return "", ""
+
+        brands = ", ".join(sorted({r["brand"] for r in rows}))
+        raise ValueError(f"브랜드가 여러 개입니다: {brands}")
+
+    finally:
+        conn.close()
 
 # =====================================================
 # HISTORY WRITE
