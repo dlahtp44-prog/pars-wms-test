@@ -10,8 +10,13 @@
 <div class="container">
   <div class="card">
     <h2>로케이션 재고</h2>
-    <p class="small">로케이션: <b>{{location}}</b></p>
 
+    <p class="small">
+      창고: <b>{{ warehouse }}</b><br>
+      로케이션: <b>{{ location }}</b>
+    </p>
+
+    {% if rows and rows|length > 0 %}
     <table>
       <thead>
         <tr>
@@ -20,24 +25,42 @@
           <th>품명</th>
           <th>LOT</th>
           <th>규격</th>
-          <th>수량</th>
+          <th class="right">수량</th>
         </tr>
       </thead>
       <tbody>
       {% for r in rows %}
         <tr>
-          <td>{{r.brand}}</td>
-          <td><a href="/m/inventory/detail?item_code={{r.item_code}}&lot={{r.lot}}&spec={{r.spec}}&brand={{r.brand}}">{{r.item_code}}</a></td>
-          <td>{{r.item_name}}</td>
-          <td>{{r.lot}}</td>
-          <td>{{r.spec}}</td>
-          <td>{{r.qty}}</td>
+          <td>{{ r.brand }}</td>
+          <td>
+            <a href="/m/inventory/detail
+              ?item_code={{ r.item_code }}
+              &lot={{ r.lot }}
+              &spec={{ r.spec }}
+              &brand={{ r.brand }}
+              &warehouse={{ warehouse }}">
+              {{ r.item_code }}
+            </a>
+          </td>
+          <td>{{ r.item_name }}</td>
+          <td>{{ r.lot }}</td>
+          <td>{{ r.spec }}</td>
+          <td class="right"><b>{{ "%.3f"|format(r.qty) }}</b></td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    {% else %}
+      <div class="empty">
+        해당 로케이션에 현재고가 없습니다.
+      </div>
+    {% endif %}
 
-    <p><a href="/m/qr">← QR</a></p>
+    <div class="actions">
+      <a class="btn" href="/m/qr?mode=move&warehouse={{ warehouse }}">이동</a>
+      <a class="btn ghost" href="/m/cs?location={{ location }}&warehouse={{ warehouse }}">CS</a>
+      <a class="btn ghost" href="/m/qr?warehouse={{ warehouse }}">QR</a>
+    </div>
   </div>
 </div>
 </body>
