@@ -384,3 +384,45 @@ def query_damage_history(
         return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
+# =====================================================
+# DAMAGE SUMMARY (CS 통계)
+# =====================================================
+
+def query_damage_summary_by_category(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    CS / 파손 현황 카테고리별 요약
+    damage_history + damage_codes JOIN
+    """
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where = []
+        params: List[Any] = []
+
+        if year:
+            pat = f"{year:04d}"
+            if month:
+                pat += f"-{month:02d}"
+            where.append("dh.occurred_at LIKE ?")
+            params.append(f"{pat}%")
+
+        sql = """
+            SELECT
+                dc.category,
+                COUNT(*) AS cnt
+            FROM damage_history dh
+            JOIN damage_codes dc
+              ON dh.damage_code_id = dc.id
+        """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+
+        sql += " GROUP BY dc.category ORDER BY cnt DESC"
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
