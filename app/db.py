@@ -526,3 +526,70 @@ def query_damage_summary_by_category(
     finally:
         conn.close()
 
+def query_all_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        where, params = [], []
+
+        if year:
+            pat = f"{int(year):04d}"
+            if month:
+                pat += f"-{int(month):02d}"
+            where.append("created_at LIKE ?")
+            params.append(f"{pat}%")
+
+        history_sql = """
+        SELECT
+            created_at,
+            type,
+            warehouse,
+            brand,
+            item_code,
+            item_name,
+            lot,
+            spec,
+            from_location AS location,
+            qty,
+            note
+        FROM history
+        """
+
+        damage_sql = """
+        SELECT
+            created_at,
+            'CS' AS type,
+            warehouse,
+            brand,
+            item_code,
+            item_name,
+            lot,
+            spec,
+            location,
+            qty * -1 AS qty,
+            detail AS note
+        FROM damage_history
+        """
+
+        sql = f"""
+        SELECT * FROM (
+            {history_sql}
+            UNION ALL
+            {damage_sql}
+        )
+        """
+
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(int(limit))
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
