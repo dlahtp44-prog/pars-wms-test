@@ -11,11 +11,7 @@ from app.core.paths import DB_PATH
 # =====================================================
 
 def get_db() -> sqlite3.Connection:
-    """
-    SQLite 안전 연결
-    - FastAPI 멀티스레드 대응
-    - database is locked 방지
-    """
+    """SQLite 안전 연결"""
     conn = sqlite3.connect(
         str(DB_PATH),
         timeout=10,
@@ -72,7 +68,7 @@ def init_db() -> None:
         ON inventory (warehouse, location, brand, item_code, lot, spec)
         """)
 
-        # HISTORY (입고/출고/이동)
+        # HISTORY (입고 / 출고 / 이동)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,7 +140,7 @@ def init_db() -> None:
 
 
 # =====================================================
-# INVENTORY CORE (단일 코어)
+# INVENTORY CORE (단일 로직)
 # =====================================================
 
 def _upsert_inventory_with_conn(
@@ -199,7 +195,7 @@ def _upsert_inventory_with_conn(
 
 
 # =====================================================
-# INVENTORY PUBLIC ENTRY (🔥 중요)
+# INVENTORY PUBLIC ENTRY
 # =====================================================
 
 def upsert_inventory(
@@ -212,22 +208,13 @@ def upsert_inventory(
     spec: str,
     qty_delta: float,
 ) -> bool:
-    """
-    엑셀 입고 / 출고 / 이동 / CS
-    모든 재고 증감의 단일 진입점
-    """
     conn = get_db()
     try:
         ok = _upsert_inventory_with_conn(
             conn,
-            warehouse=warehouse,
-            location=location,
-            brand=brand,
-            item_code=item_code,
-            item_name=item_name,
-            lot=lot,
-            spec=spec,
-            qty_delta=qty_delta,
+            warehouse, location, brand,
+            item_code, item_name, lot, spec,
+            qty_delta,
         )
         if ok:
             conn.commit()
@@ -269,15 +256,16 @@ def query_inventory(
 
         sql = "SELECT * FROM inventory WHERE " + " AND ".join(where)
         sql += " ORDER BY updated_at DESC LIMIT ?"
-        params.append(int(limit))
+        params.append(limit)
 
         cur.execute(sql, params)
         return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
 
+
 # =====================================================
-# BRAND / ITEM RESOLVE (이동 / 출고용)
+# BRAND / ITEM RESOLVE (이동 / 출고)
 # =====================================================
 
 def resolve_inventory_brand_and_name(
@@ -288,24 +276,17 @@ def resolve_inventory_brand_and_name(
     spec: str,
     brand: str = "",
 ) -> Tuple[str, str]:
-    """
-    이동 / 출고 시
-    - 브랜드가 없으면 inventory 기준으로 자동 보정
-    - 단일 결과만 허용
-    """
     conn = get_db()
     try:
         cur = conn.cursor()
 
-        # 브랜드가 이미 들어온 경우 → 그대로 사용
         if brand:
             cur.execute("""
             SELECT brand, item_name
             FROM inventory
-            WHERE warehouse=? AND location=? AND brand=? 
+            WHERE warehouse=? AND location=? AND brand=?
               AND item_code=? AND lot=? AND spec=?
-            ORDER BY updated_at DESC
-            LIMIT 1
+            ORDER BY updated_at DESC LIMIT 1
             """, (
                 _norm(warehouse), _norm(location), _norm(brand),
                 _norm(item_code), _norm(lot), _norm(spec)
@@ -313,11 +294,10 @@ def resolve_inventory_brand_and_name(
             r = cur.fetchone()
             return (r["brand"], r["item_name"]) if r else (brand, "")
 
-        # 브랜드 미지정 → inventory 기준 탐색
         cur.execute("""
         SELECT DISTINCT brand, item_name
         FROM inventory
-        WHERE warehouse=? AND location=? 
+        WHERE warehouse=? AND location=?
           AND item_code=? AND lot=? AND spec=? AND qty > 0
         """, (
             _norm(warehouse), _norm(location),
@@ -327,15 +307,14 @@ def resolve_inventory_brand_and_name(
 
         if len(rows) == 1:
             return rows[0]["brand"], rows[0]["item_name"]
-
         if len(rows) == 0:
             return "", ""
 
-        brands = ", ".join(sorted({r["brand"] for r in rows}))
-        raise ValueError(f"브랜드가 여러 개입니다: {brands}")
+        raise ValueError("브랜드 중복")
 
     finally:
         conn.close()
+
 
 # =====================================================
 # HISTORY WRITE
@@ -357,8 +336,7 @@ def add_history(
 ):
     conn = get_db()
     try:
-        cur = conn.cursor()
-        cur.execute("""
+        conn.execute("""
         INSERT INTO history
         (type, warehouse, operator, brand, item_code, item_name,
          lot, spec, from_location, to_location, qty, note, created_at)
@@ -376,7 +354,7 @@ def add_history(
 
 
 # =====================================================
-# HISTORY QUERY (통합 화면용)
+# HISTORY QUERY (통합)
 # =====================================================
 
 def query_all_history(
@@ -386,46 +364,25 @@ def query_all_history(
 ) -> List[Dict[str, Any]]:
     conn = get_db()
     try:
-        cur = conn.cursor()
         where, params = [], []
 
         if year:
-            pat = f"{int(year):04d}"
+            pat = f"{year:04d}"
             if month:
-                pat += f"-{int(month):02d}"
+                pat += f"-{month:02d}"
             where.append("created_at LIKE ?")
             params.append(f"{pat}%")
 
-        sql = f"""
+        sql = """
         SELECT * FROM (
-            SELECT
-                created_at,
-                type,
-                warehouse,
-                brand,
-                item_code,
-                item_name,
-                lot,
-                spec,
-                from_location AS location,
-                qty,
-                note
+            SELECT created_at, type, warehouse, brand,
+                   item_code, item_name, lot, spec,
+                   from_location AS location, qty, note
             FROM history
-
             UNION ALL
-
-            SELECT
-                created_at,
-                'CS' AS type,
-                warehouse,
-                brand,
-                item_code,
-                item_name,
-                lot,
-                spec,
-                location,
-                qty * -1 AS qty,
-                detail AS note
+            SELECT created_at, 'CS', warehouse, brand,
+                   item_code, item_name, lot, spec,
+                   location, qty * -1, detail
             FROM damage_history
         )
         """
@@ -434,9 +391,26 @@ def query_all_history(
             sql += " WHERE " + " AND ".join(where)
 
         sql += " ORDER BY created_at DESC LIMIT ?"
-        params.append(int(limit))
+        params.append(limit)
 
-        cur.execute(sql, params)
+        cur = conn.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+# =====================================================
+# DAMAGE CODE LIST
+# =====================================================
+
+def list_damage_codes(active_only: bool = True) -> List[Dict[str, Any]]:
+    conn = get_db()
+    try:
+        sql = "SELECT * FROM damage_codes"
+        if active_only:
+            sql += " WHERE is_active = 1"
+        sql += " ORDER BY category, type, situation"
+        cur = conn.execute(sql)
         return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
