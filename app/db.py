@@ -159,6 +159,39 @@ def _norm(v: Optional[str]) -> str:
 # INVENTORY
 # =====================================================
 
+def query_inventory(
+    warehouse: Optional[str] = None,
+    item_code: Optional[str] = None,
+    brand: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """재고 현황 조회 (누락되어 에러 발생했던 부분 추가)"""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    where = []
+    params = []
+    
+    if warehouse:
+        where.append("warehouse = ?")
+        params.append(_norm(warehouse))
+    if item_code:
+        where.append("item_code LIKE ?")
+        params.append(f"%{_norm(item_code)}%")
+    if brand:
+        where.append("brand = ?")
+        params.append(_norm(brand))
+        
+    sql = "SELECT * FROM inventory"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY warehouse, item_code, lot"
+    
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
 def upsert_inventory(
     warehouse: str,
     location: str,
@@ -170,11 +203,6 @@ def upsert_inventory(
     qty_delta: float,
     note: str = "",
 ) -> None:
-    """
-    정책:
-    - 동일 key 존재 시: qty / note / updated_at 만 변경
-    - item_name은 신규 row에서만 저장
-    """
     now = datetime.now().isoformat(timespec="seconds")
     qty_delta = _q3(qty_delta)
 
@@ -218,46 +246,6 @@ def upsert_inventory(
 
     conn.commit()
     conn.close()
-
-
-def query_history(
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    day: Optional[int] = None,
-    limit: int = 500,
-) -> List[Dict[str, Any]]:
-    conn = get_db()
-    cur = conn.cursor()
-
-    where = []
-    params: List[Any] = []
-
-    # created_at 예: 2026-01-08T14:32:10
-    if year:
-        y = f"{int(year):04d}"
-        if month:
-            m = f"{int(month):02d}"
-            if day:
-                d = f"{int(day):02d}"
-                where.append("created_at LIKE ?")
-                params.append(f"{y}-{m}-{d}%")
-            else:
-                where.append("created_at LIKE ?")
-                params.append(f"{y}-{m}%")
-        else:
-            where.append("created_at LIKE ?")
-            params.append(f"{y}%")
-
-    sql = "SELECT * FROM history"
-    if where:
-        sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
-
-    cur.execute(sql, params)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
 
 
 # =====================================================
@@ -320,16 +308,41 @@ def add_history(
     conn.close()
 
 
-def query_history(limit: int = 500) -> List[Dict[str, Any]]:
+def query_history(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    """히스토리 통합 쿼리 함수 (중복 제거 및 파라미터 통합)"""
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT * FROM history
-        ORDER BY created_at DESC
-        LIMIT ?
-    """, (limit,))
+    where = []
+    params: List[Any] = []
 
+    if year:
+        y = f"{int(year):04d}"
+        if month:
+            m = f"{int(month):02d}"
+            if day:
+                d = f"{int(day):02d}"
+                where.append("created_at LIKE ?")
+                params.append(f"{y}-{m}-{d}%")
+            else:
+                where.append("created_at LIKE ?")
+                params.append(f"{y}-{m}%")
+        else:
+            where.append("created_at LIKE ?")
+            params.append(f"{y}%")
+
+    sql = "SELECT * FROM history"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+
+    cur.execute(sql, params)
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
@@ -456,6 +469,8 @@ def query_damage_history(
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+
+
 def query_damage_summary_by_category(
     year: Optional[int] = None,
     month: Optional[int] = None,
