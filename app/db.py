@@ -516,3 +516,13 @@ def query_damage_summary_by_category(
         FROM damage_history dh
         JOIN damage_codes dc ON dh.damage_code_id = dc.id
         """
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+
+        sql += " GROUP BY dc.category ORDER BY cnt DESC"
+
+        cur.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
