@@ -1,0 +1,26 @@
+<h2>📋 제품 라벨 미리보기</h2>
+
+<form method="post" action="/label/제품/excel/print">
+    {% for item in items %}
+        <input type="hidden" name="codes" value="{{ item.code }}">
+        <input type="hidden" name="names" value="{{ item.name }}">
+        <input type="hidden" name="lots" value="{{ item.lot }}">
+        <input type="hidden" name="specs" value="{{ item.spec }}">
+    {% endfor %}
+
+    <input type="hidden" name="size" value="{{ size }}">
+    <input type="hidden" name="qty" value="{{ qty }}">
+
+    <ul>
+    {% for item in items %}
+        <li>
+            {{ item.code }} /
+            {{ item.name }} /
+            LOT {{ item.lot }} /
+            {{ item.spec }}
+        </li>
+    {% endfor %}
+    </ul>
+
+    <button type="submit">제품 라벨 출력</button>
+</form>
