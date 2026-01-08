@@ -1,0 +1,16 @@
+<h2>📦 제품 엑셀 업로드</h2>
+
+<form method="post" action="/label/제품/excel/preview" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xlsx" required>
+
+    <label>라벨 사이즈</label>
+    <select name="size">
+        <option value="70x40">70 × 40</option>
+        <option value="50x30">50 × 30</option>
+    </select>
+
+    <label>각 제품당 출력 장수</label>
+    <input type="number" name="qty" value="1" min="1">
+
+    <button type="submit">미리보기</button>
+</form>
