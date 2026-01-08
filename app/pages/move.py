@@ -10,7 +10,10 @@ from app.db import (
     resolve_inventory_brand_and_name,
 )
 
+# 페이지 라우터
 router = APIRouter(prefix="/page/move", tags=["page-move"])
+
+# 템플릿 경로
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
@@ -21,6 +24,9 @@ def move_page(
     location: str = "",
     msg: str = "",
 ):
+    """
+    이동 페이지 렌더링
+    """
     rows = []
     if warehouse and location:
         rows = query_inventory(
@@ -30,7 +36,8 @@ def move_page(
         )
 
     return templates.TemplateResponse(
-        "pages/move.html",
+        # ✅ FIX: 잘못된 pages/move.html → move.html
+        "move.html",
         {
             "request": request,
             "warehouse": warehouse,
@@ -55,19 +62,25 @@ def move_do(
     operator: str = Form(""),
     note: str = Form(""),
 ):
+    """
+    재고 이동 처리
+    """
+
+    # 수량 체크
     if qty <= 0:
         return RedirectResponse(
             url=f"/page/move?warehouse={warehouse}&location={from_location}&msg=이동_수량은_1_이상",
             status_code=303,
         )
 
+    # 동일 로케이션 이동 방지
     if from_location == to_location:
         return RedirectResponse(
             url=f"/page/move?warehouse={warehouse}&location={from_location}&msg=출발_도착_로케이션_동일",
             status_code=303,
         )
 
-    # ✅ 브랜드 자동 보정
+    # ✅ 브랜드/품명 자동 보정
     try:
         resolved_brand, resolved_name = resolve_inventory_brand_and_name(
             warehouse=warehouse,
@@ -86,7 +99,7 @@ def move_do(
     final_brand = resolved_brand or brand
     final_name = item_name or resolved_name
 
-    # 1️⃣ 출발지 차감
+    # 1️⃣ 출발지 재고 차감
     ok = upsert_inventory(
         warehouse=warehouse,
         location=from_location,
@@ -105,7 +118,7 @@ def move_do(
             status_code=303,
         )
 
-    # 2️⃣ 도착지 가산
+    # 2️⃣ 도착지 재고 가산
     upsert_inventory(
         warehouse=warehouse,
         location=to_location,
@@ -118,7 +131,7 @@ def move_do(
         note=note or "이동 도착",
     )
 
-    # 3️⃣ 이력
+    # 3️⃣ 이력 기록
     add_history(
         type="이동",
         warehouse=warehouse,
