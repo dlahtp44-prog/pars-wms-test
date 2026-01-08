@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Form, HTTPException
-from app.db import upsert_inventory, add_history
+from app.db import (
+    upsert_inventory,
+    add_history,
+    resolve_inventory_brand_and_name,
+)
 
 router = APIRouter(prefix="/api/outbound", tags=["출고"])
+
 
 @router.post("")
 def outbound(
@@ -16,6 +21,22 @@ def outbound(
     operator: str = Form(""),
     note: str = Form(""),
 ):
+    # 0️⃣ 브랜드 / 품명 자동 보정
+    try:
+        brand, resolved_item_name = resolve_inventory_brand_and_name(
+            warehouse=warehouse,
+            location=location,
+            item_code=item_code,
+            lot=lot,
+            spec=spec,
+            brand=brand,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not item_name:
+        item_name = resolved_item_name
+
     # 1️⃣ 재고 차감
     ok = upsert_inventory(
         warehouse=warehouse,
@@ -26,7 +47,7 @@ def outbound(
         lot=lot,
         spec=spec,
         qty_delta=-qty,
-        note=note,
+        note=note or "출고",
     )
     if not ok:
         raise HTTPException(status_code=400, detail="재고 부족")
@@ -44,7 +65,7 @@ def outbound(
         from_location=location,
         to_location="",
         qty=qty,
-        note=note,
+        note=note or "출고",
     )
 
     return {"ok": True}
